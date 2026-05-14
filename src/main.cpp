@@ -120,7 +120,7 @@ int WINAPI WinMain(
     // ── 2. Create overlay window ──────────────────────────────────────────────
 
     Overlay overlay;
-    if (!overlay.Create(kResolutions[gResIdx].w, kResolutions[gResIdx].h, L"CS2 Overlay"))
+    if (!overlay.Create(kResolutions[gResIdx].w, kResolutions[gResIdx].h, L"CS2 Wallhack"))
     {
         MessageBoxW(nullptr, L"Failed to create overlay window.",
                     L"Overlay — Window Error", MB_ICONERROR | MB_OK);

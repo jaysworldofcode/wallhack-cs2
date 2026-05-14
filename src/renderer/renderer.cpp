@@ -442,7 +442,7 @@ void Renderer::DrawMenu(bool visible, const wchar_t* resLabel)
 
     // ── Title ─────────────────────────────────────────────────────────────────
     {
-        const wchar_t* title = L"CS2 Overlay";
+        const wchar_t* title = L"CS2 Wallhack";
         D2D1_RECT_F r = D2D1::RectF(kPanelX + kPad, kPanelY + 6.f,
                                      kPanelX + kPanelW - kPad, kPanelY + 6.f + kLineH);
         // shadow
