@@ -198,7 +198,8 @@ int WINAPI WinMain(
                 continue;   // entity is behind the camera or off-screen
 
             const bool isEnemy = entity.IsEnemy(entityMgr.LocalTeam());
-            if (!isEnemy) continue;  // don't draw teammates
+            if (!isEnemy) continue;        // don't draw teammates
+            if (!entity.alive) continue;   // hide box while dead
             renderer.DrawEntity(entity, *screenBox, isEnemy);
         }
 
