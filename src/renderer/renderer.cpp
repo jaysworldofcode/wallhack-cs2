@@ -186,9 +186,6 @@ void Renderer::DrawEntity(const EntityData& entity,
 
     // ── Draw the AABB bounding box ────────────────────────────────────────────
     DrawCornerBox(rect, m_brush.Get());
-
-    // ── Draw the player name ──────────────────────────────────────────────────
-    DrawName(entity, box);
 }
 
 // ── Renderer::DrawCornerBox ───────────────────────────────────────────────────
