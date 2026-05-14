@@ -91,6 +91,23 @@ namespace Pawn
 
     // CGameSceneNode* — contains world-space position and dormancy flag.
     constexpr uintptr_t m_pGameSceneNode = 0x330;
+
+    // ── Batch-read optimisation ───────────────────────────────────────────────
+    // Reading every pawn field individually costs 4+ RPM syscalls.
+    // Instead we read the span [m_pGameSceneNode .. m_iTeamNum] in one call.
+    //
+    //   Base offset          : 0x330  (m_pGameSceneNode)
+    //   End  offset          : 0x3EB  (m_iTeamNum)
+    //   Buffer size          : 0xBC   (188 bytes)
+    //
+    // Field offsets *within* the 0xBC buffer:
+    constexpr uintptr_t kBatchBase        = m_pGameSceneNode;       // 0x330
+    constexpr size_t    kBatchSize        = m_iTeamNum - kBatchBase + 1; // 0xBC
+
+    constexpr size_t    kOff_SceneNode    = m_pGameSceneNode - kBatchBase; // 0x000
+    constexpr size_t    kOff_Health       = m_iHealth        - kBatchBase; // 0x01C
+    constexpr size_t    kOff_LifeState    = m_lifeState      - kBatchBase; // 0x024
+    constexpr size_t    kOff_TeamNum      = m_iTeamNum       - kBatchBase; // 0x0BB
 }
 
 // ── CGameSceneNode ────────────────────────────────────────────────────────────

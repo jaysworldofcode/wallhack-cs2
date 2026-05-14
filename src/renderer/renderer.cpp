@@ -80,7 +80,7 @@ bool Renderer::CreateDeviceResources()
     D2D1_HWND_RENDER_TARGET_PROPERTIES hwndProps = D2D1::HwndRenderTargetProperties(
         m_hwnd,
         D2D1::SizeU(m_width, m_height),
-        D2D1_PRESENT_OPTIONS_NONE
+        D2D1_PRESENT_OPTIONS_IMMEDIATELY
     );
 
     HRESULT hr = m_d2dFactory->CreateHwndRenderTarget(

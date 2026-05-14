@@ -72,15 +72,37 @@ private:
     std::vector<EntityData> m_entities;
     std::wstring m_debugLine;
 
+    // ── Controller cache ──────────────────────────────────────────────────────
+    // Scanning 64 entity-list slots costs ~128 RPM calls. We do it once every
+    // kCacheFrames frames (~2 Hz at 60 fps) and store the stable controller
+    // addresses + player names (names never change mid-match).
+    struct CachedController
+    {
+        uintptr_t addr = 0;
+        std::string name;
+    };
+
+    std::vector<CachedController> m_controllerCache;
+    uintptr_t m_chunk0Ptr     = 0; // chunk-0 pointer (indices 0-511), cached
+    int       m_frameCounter  = 0;
+
+    // Refresh the controller list every N frames.
+    static constexpr int kCacheFrames = 30; // 2 Hz at 60 fps
+
     // Internal helpers --------------------------------------------------------
 
     /// Reads one CCSPlayerController at `controllerAddr`, resolves the pawn,
     /// and populates `out`.  Returns false if the entity should be skipped.
-    bool ReadController(uintptr_t controllerAddr,
-                        uintptr_t chunkArrayAddr,
-                        EntityData& out) const;
+    /// If `nameOverride` is non-null it is used instead of re-reading the name.
+    bool ReadController(uintptr_t   controllerAddr,
+                        uintptr_t   chunkArrayAddr,
+                        EntityData& out,
+                        const std::string* nameOverride = nullptr) const;
 
     /// Resolve a CEntityInstance* from a chunk array and entity index.
     /// Validates the handle stored in the identity slot before returning.
-    uintptr_t GetEntityByIndex(uintptr_t chunkArrayAddr, int index) const;
+    /// `chunk0Cache` may be non-zero to skip the chunk-ptr RPM for index < 512.
+    uintptr_t GetEntityByIndex(uintptr_t chunkArrayAddr,
+                               int       index,
+                               uintptr_t chunk0Cache = 0) const;
 };
