@@ -1,0 +1,10 @@
+^E:\PROJECTS\CS2C\BUILD\CMAKEFILES\8B8FEF4F9620DBB8FF0F8114F5DEF4CE\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SE:/Projects/cs2c -BE:/Projects/cs2c/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file E:/Projects/cs2c/build/cs2_overlay.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
