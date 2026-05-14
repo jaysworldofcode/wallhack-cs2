@@ -91,65 +91,56 @@ bool EntityManager::Update()
         ? Memory::Read<uint8_t>(m_hProcess, localControllerAddr + Offsets::Pawn::m_iTeamNum)
         : 0;
 
-    // ── 3. Scan chunk 1 directly for player PAWNS ─────────────────────────────
+    // ── 3. Scan ALL chunks for player PAWNS ──────────────────────────────────
     //
-    // Player pawns in CS2 have entity indices 512-1023 (chunk 1).
-    // Instead of finding controllers in chunk 0 and resolving handles,
-    // we scan chunk 1 directly and validate each slot as a pawn by
-    // checking team (2/3) and health (1-200) — much more reliable.
+    // Scan up to 8 chunks (entity indices 0-4095) to find all player pawns.
+    // Validate by team (2=T, 3=CT) and a valid scene node.
+    // Dormancy is NOT filtered — ESP should show enemies through walls.
     //
-    uintptr_t chunk1 = Memory::Read<uintptr_t>(
-        m_hProcess, chunkArrayAddr + 1 * sizeof(uintptr_t));
-    if (!chunk1)
+    int nRaw = 0, nNoTeam = 0, nNoScene = 0;
+    for (int chunk = 0; chunk < 8; ++chunk)
     {
-        wchar_t buf[128];
-        swprintf_s(buf, L"chunk1=0 | arr=%llX", (unsigned long long)chunkArrayAddr);
-        m_debugLine = buf;
-        return false;
-    }
+        uintptr_t chunkPtr = Memory::Read<uintptr_t>(
+            m_hProcess, chunkArrayAddr + chunk * sizeof(uintptr_t));
+        if (!chunkPtr) continue;
 
-    int rawFound = 0, nNoScene = 0, nDormant = 0;
-    for (int slot = 0; slot < Offsets::EntityList::kChunkSize; ++slot)
-    {
-        uintptr_t identityAddr = chunk1 + slot * Offsets::EntityIdentity::kStride;
-        uintptr_t pawnAddr = Memory::Read<uintptr_t>(
-            m_hProcess, identityAddr + Offsets::EntityIdentity::pObject);
-        if (!pawnAddr) continue;
+        for (int slot = 0; slot < Offsets::EntityList::kChunkSize; ++slot)
+        {
+            uintptr_t identityAddr = chunkPtr + slot * Offsets::EntityIdentity::kStride;
+            uintptr_t pawnAddr = Memory::Read<uintptr_t>(
+                m_hProcess, identityAddr + Offsets::EntityIdentity::pObject);
+            if (!pawnAddr) continue;
+            if (pawnAddr == localPawnAddr) continue; // skip self
 
-        // Validate as a player pawn: must have team 2 (T) or 3 (CT)
-        uint8_t team = Memory::Read<uint8_t>(m_hProcess, pawnAddr + Offsets::Pawn::m_iTeamNum);
-        if (team != 2 && team != 3) continue;
+            ++nRaw;
 
-        // Health sanity check (0-200)
-        int32_t health = Memory::Read<int32_t>(m_hProcess, pawnAddr + Offsets::Pawn::m_iHealth);
-        if (health < 0 || health > 200) continue;
+            // Must be a player team
+            uint8_t team = Memory::Read<uint8_t>(m_hProcess, pawnAddr + Offsets::Pawn::m_iTeamNum);
+            if (team != 2 && team != 3) { ++nNoTeam; continue; }
 
-        ++rawFound;
+            // Must have a valid scene node for position
+            uintptr_t sceneNode = Memory::Read<uintptr_t>(
+                m_hProcess, pawnAddr + Offsets::Pawn::m_pGameSceneNode);
+            if (!sceneNode) { ++nNoScene; continue; }
 
-        uintptr_t sceneNode = Memory::Read<uintptr_t>(
-            m_hProcess, pawnAddr + Offsets::Pawn::m_pGameSceneNode);
-        if (!sceneNode) { ++nNoScene; continue; }
+            int32_t health = Memory::Read<int32_t>(m_hProcess, pawnAddr + Offsets::Pawn::m_iHealth);
 
-        bool dormant = Memory::Read<bool>(
-            m_hProcess, sceneNode + Offsets::GameSceneNode::m_bDormant);
-        if (dormant) { ++nDormant; continue; }
-
-        EntityData data;
-        data.pawnAddress = pawnAddr;
-        data.alive  = (Memory::Read<uint8_t>(m_hProcess, pawnAddr + Offsets::Pawn::m_lifeState) == 0);
-        data.team   = static_cast<int>(team);
-        data.health = health;
-        data.origin = Memory::Read<Vec3>(
-            m_hProcess, sceneNode + Offsets::GameSceneNode::m_vecAbsOrigin);
-        data.name   = "";
-        m_entities.push_back(data);
+            EntityData data;
+            data.pawnAddress = pawnAddr;
+            data.alive  = (Memory::Read<uint8_t>(m_hProcess, pawnAddr + Offsets::Pawn::m_lifeState) == 0);
+            data.team   = static_cast<int>(team);
+            data.health = health;
+            data.origin = Memory::Read<Vec3>(
+                m_hProcess, sceneNode + Offsets::GameSceneNode::m_vecAbsOrigin);
+            data.name   = "";
+            m_entities.push_back(data);
+        }
     }
 
     wchar_t buf[192];
-    swprintf_s(buf, L"cTm=%d | chunk1=%llX raw=%d ns=%d dr=%d ps=%d",
+    swprintf_s(buf, L"cTm=%d raw=%d nt=%d ns=%d ps=%d",
         (int)ctrlTeam,
-        (unsigned long long)chunk1,
-        rawFound, nNoScene, nDormant, (int)m_entities.size());
+        nRaw, nNoTeam, nNoScene, (int)m_entities.size());
     m_debugLine = buf;
     return true;
 }
