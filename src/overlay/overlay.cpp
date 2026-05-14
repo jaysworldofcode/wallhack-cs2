@@ -122,8 +122,9 @@ LRESULT CALLBACK Overlay::WndProc(HWND hwnd, UINT msg,
         }
 
         case WM_KEYDOWN:
-            // Allow INSERT or END key to close the overlay cleanly.
-            if (wParam == VK_INSERT || wParam == VK_END)
+            // Allow END key to close the overlay cleanly.
+            // INSERT is handled in the main loop for menu toggling.
+            if (wParam == VK_END)
                 PostQuitMessage(0);
             return 0;
 

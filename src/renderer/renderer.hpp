@@ -62,6 +62,13 @@ public:
     ///   [RED   dot]  Not attached                 ← process / module missing
     void DrawDebugHUD(bool attached, int entityCount, const std::wstring& diagLine = {});
 
+    /// Draw the toggleable overlay menu panel (INSERT key).
+    /// When visible = false the function is a no-op.
+    void DrawMenu(bool visible);
+
+    /// Draw a persistent "Developed by JayLord" watermark in the bottom-right.
+    void DrawWatermark();
+
     // Dimensions (needed by the caller to pass to WorldToScreen / GetScreenBox).
     int Width()  const { return m_width;  }
     int Height() const { return m_height; }
@@ -85,7 +92,8 @@ private:
 
     // DirectWrite (text)
     ComPtr<IDWriteFactory>        m_dwFactory;
-    ComPtr<IDWriteTextFormat>     m_textFormat;
+    ComPtr<IDWriteTextFormat>     m_textFormat;      // centred, 11pt — entity labels
+    ComPtr<IDWriteTextFormat>     m_menuTextFormat;  // left-aligned, 10pt — menu / watermark
 
     // Shared brushes (created once; colour modified per draw call).
     ComPtr<ID2D1SolidColorBrush>  m_brush;         // general-purpose

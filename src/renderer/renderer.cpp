@@ -47,6 +47,22 @@ bool Renderer::Init(HWND hwnd, int width, int height)
     m_textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
     m_textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
 
+    // Left-aligned format for the menu panel and watermark.
+    hr = m_dwFactory->CreateTextFormat(
+        L"Consolas",
+        nullptr,
+        DWRITE_FONT_WEIGHT_REGULAR,
+        DWRITE_FONT_STYLE_NORMAL,
+        DWRITE_FONT_STRETCH_NORMAL,
+        10.f,
+        L"en-us",
+        m_menuTextFormat.GetAddressOf()
+    );
+    if (FAILED(hr)) return false;
+
+    m_menuTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+    m_menuTextFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+
     return CreateDeviceResources();
 }
 
@@ -113,6 +129,7 @@ void Renderer::Shutdown()
 {
     ReleaseDeviceResources();
     m_textFormat.Reset();
+    m_menuTextFormat.Reset();
     m_dwFactory.Reset();
     m_d2dFactory.Reset();
 }
@@ -169,21 +186,6 @@ void Renderer::DrawEntity(const EntityData& entity,
 
     // ── Draw the AABB bounding box ────────────────────────────────────────────
     DrawCornerBox(rect, m_brush.Get());
-
-    // ── Draw HP number below the box ─────────────────────────────────────────
-    {
-        wchar_t hpBuf[8];
-        swprintf_s(hpBuf, L"%d", std::clamp(entity.health, 0, 999));
-        const UINT32 hpLen = static_cast<UINT32>(wcslen(hpBuf));
-        D2D1_RECT_F hpRect = D2D1::RectF(box.left, box.bottom + 2.f, box.right, box.bottom + 16.f);
-        // shadow
-        m_shadowBrush->SetOpacity(0.85f);
-        D2D1_RECT_F hpShadow = D2D1::RectF(hpRect.left+1.f, hpRect.top+1.f, hpRect.right+1.f, hpRect.bottom+1.f);
-        m_renderTarget->DrawText(hpBuf, hpLen, m_textFormat.Get(), hpShadow, m_shadowBrush.Get());
-        // coloured text (green->yellow->red)
-        m_hpFillBrush->SetColor(HpColour(entity.health));
-        m_renderTarget->DrawText(hpBuf, hpLen, m_textFormat.Get(), hpRect, m_hpFillBrush.Get());
-    }
 
     // ── Draw the player name ──────────────────────────────────────────────────
     DrawName(entity, box);
@@ -403,4 +405,124 @@ void Renderer::DrawDebugHUD(bool attached, int entityCount, const std::wstring& 
         D2D1::RectF(dotX * 2.f, dotY - 7.f, 900.f, dotY + 10.f),
         m_brush.Get()
     );
+}
+
+// ── Renderer::DrawMenu ────────────────────────────────────────────────────────
+//
+// Semi-transparent panel shown when the user presses INSERT.
+// Displays feature state and basic key hints.
+
+void Renderer::DrawMenu(bool visible)
+{
+    if (!visible) return;
+
+    constexpr float kPanelX = 20.f;
+    constexpr float kPanelY = 40.f;
+    constexpr float kPanelW = 210.f;
+    constexpr float kPanelH = 120.f;
+    constexpr float kPad    = 10.f;
+    constexpr float kLineH  = 18.f;
+
+    D2D1_RECT_F panel = D2D1::RectF(kPanelX, kPanelY,
+                                     kPanelX + kPanelW, kPanelY + kPanelH);
+
+    // Background
+    m_hpBgBrush->SetOpacity(0.80f);
+    m_renderTarget->FillRectangle(panel, m_hpBgBrush.Get());
+
+    // Border (cyan-ish)
+    m_brush->SetColor(D2D1::ColorF(0.3f, 0.75f, 1.0f, 1.f));
+    m_renderTarget->DrawRectangle(panel, m_brush.Get(), 1.2f);
+
+    // ── Title ─────────────────────────────────────────────────────────────────
+    {
+        const wchar_t* title = L"CS2 Overlay";
+        D2D1_RECT_F r = D2D1::RectF(kPanelX + kPad, kPanelY + 6.f,
+                                     kPanelX + kPanelW - kPad, kPanelY + 6.f + kLineH);
+        // shadow
+        m_shadowBrush->SetOpacity(0.9f);
+        m_renderTarget->DrawText(title, static_cast<UINT32>(wcslen(title)),
+            m_menuTextFormat.Get(),
+            D2D1::RectF(r.left+1.f, r.top+1.f, r.right+1.f, r.bottom+1.f),
+            m_shadowBrush.Get());
+        m_brush->SetColor(D2D1::ColorF(0.3f, 0.85f, 1.0f, 1.f));
+        m_renderTarget->DrawText(title, static_cast<UINT32>(wcslen(title)),
+            m_menuTextFormat.Get(), r, m_brush.Get());
+    }
+
+    // Divider
+    const float divY = kPanelY + 28.f;
+    m_brush->SetColor(D2D1::ColorF(0.3f, 0.75f, 1.0f, 0.45f));
+    m_renderTarget->DrawLine(
+        D2D1::Point2F(kPanelX + kPad, divY),
+        D2D1::Point2F(kPanelX + kPanelW - kPad, divY),
+        m_brush.Get(), 0.8f);
+
+    // ── ESP Boxes line ────────────────────────────────────────────────────────
+    {
+        const wchar_t* line = L"ESP Boxes:  ON";
+        float lineY = divY + 6.f;
+        D2D1_RECT_F r = D2D1::RectF(kPanelX + kPad, lineY,
+                                     kPanelX + kPanelW - kPad, lineY + kLineH);
+        m_brush->SetColor(D2D1::ColorF(0.27f, 1.0f, 0.27f, 1.f));   // green = on
+        m_renderTarget->DrawText(line, static_cast<UINT32>(wcslen(line)),
+            m_menuTextFormat.Get(), r, m_brush.Get());
+    }
+
+    // ── Credit ────────────────────────────────────────────────────────────────
+    {
+        const wchar_t* credit = L"Developed by JayLord";
+        float lineY = divY + 28.f;
+        D2D1_RECT_F r = D2D1::RectF(kPanelX + kPad, lineY,
+                                     kPanelX + kPanelW - kPad, lineY + kLineH);
+        m_shadowBrush->SetOpacity(0.8f);
+        m_renderTarget->DrawText(credit, static_cast<UINT32>(wcslen(credit)),
+            m_menuTextFormat.Get(),
+            D2D1::RectF(r.left+1.f, r.top+1.f, r.right+1.f, r.bottom+1.f),
+            m_shadowBrush.Get());
+        m_brush->SetColor(D2D1::ColorF(0.85f, 0.85f, 0.85f, 1.f));
+        m_renderTarget->DrawText(credit, static_cast<UINT32>(wcslen(credit)),
+            m_menuTextFormat.Get(), r, m_brush.Get());
+    }
+
+    // ── Hint ──────────────────────────────────────────────────────────────────
+    {
+        const wchar_t* hint = L"[INSERT] Toggle  |  [END] Exit";
+        float lineY = kPanelY + kPanelH - kLineH - 6.f;
+        D2D1_RECT_F r = D2D1::RectF(kPanelX + kPad, lineY,
+                                     kPanelX + kPanelW - kPad, lineY + kLineH);
+        m_brush->SetColor(D2D1::ColorF(0.5f, 0.5f, 0.5f, 0.9f));
+        m_renderTarget->DrawText(hint, static_cast<UINT32>(wcslen(hint)),
+            m_menuTextFormat.Get(), r, m_brush.Get());
+    }
+}
+
+// ── Renderer::DrawWatermark ───────────────────────────────────────────────────
+//
+// Persistent "Developed by JayLord" credit in the bottom-right corner.
+// Always rendered regardless of menu state.
+
+void Renderer::DrawWatermark()
+{
+    constexpr wchar_t kText[] = L"Developed by JayLord";
+    constexpr float   kTextW  = 165.f;
+    constexpr float   kTextH  = 14.f;
+    constexpr float   kMargin = 10.f;
+
+    const float x = static_cast<float>(m_width)  - kTextW - kMargin;
+    const float y = static_cast<float>(m_height) - kTextH - kMargin;
+
+    D2D1_RECT_F r = D2D1::RectF(x, y, x + kTextW, y + kTextH);
+
+    // Drop shadow
+    m_shadowBrush->SetOpacity(0.75f);
+    m_renderTarget->DrawText(kText, static_cast<UINT32>(wcslen(kText)),
+        m_menuTextFormat.Get(),
+        D2D1::RectF(r.left+1.f, r.top+1.f, r.right+1.f, r.bottom+1.f),
+        m_shadowBrush.Get());
+
+    // Foreground (subtle grey)
+    m_brush->SetColor(D2D1::ColorF(0.75f, 0.75f, 0.75f, 0.80f));
+    m_renderTarget->DrawText(kText, static_cast<UINT32>(wcslen(kText)),
+        m_menuTextFormat.Get(), r, m_brush.Get());
 }

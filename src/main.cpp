@@ -128,9 +128,18 @@ int WINAPI WinMain(
 
     // ── 5. Main loop ──────────────────────────────────────────────────────────
 
+    bool menuVisible  = false;  // toggled by INSERT key
+    bool prevInsert   = false;  // for edge-detection (avoid repeat while held)
+
     while (true)
     {
         const auto frameStart = std::chrono::steady_clock::now();
+
+        // ── INSERT key: toggle menu (edge-detect so one press = one toggle) ──
+        const bool curInsert = (GetAsyncKeyState(VK_INSERT) & 0x8000) != 0;
+        if (curInsert && !prevInsert)
+            menuVisible = !menuVisible;
+        prevInsert = curInsert;
 
         // Process Windows messages; exit loop on WM_QUIT.
         if (!overlay.PumpMessages())
@@ -168,6 +177,12 @@ int WINAPI WinMain(
         renderer.DrawDebugHUD(/*entityListOk=*/gotEntities,
                                static_cast<int>(entities.size()),
                                entityMgr.DebugLine());
+
+        // Always-visible watermark.
+        renderer.DrawWatermark();
+
+        // Toggleable menu panel (INSERT key).
+        renderer.DrawMenu(menuVisible);
 
         for (const EntityData& entity : entities)
         {
