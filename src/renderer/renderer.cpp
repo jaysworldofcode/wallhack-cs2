@@ -466,7 +466,7 @@ void Renderer::DrawMenu(bool visible, const wchar_t* resLabel)
 
     // ── ESP Boxes line ────────────────────────────────────────────────────────
     {
-        const wchar_t* line = L"ESP Boxes:  ON";
+        const wchar_t* line = L"Wallhack:  ON";
         float lineY = divY + 6.f;
         D2D1_RECT_F r = D2D1::RectF(kPanelX + kPad, lineY,
                                      kPanelX + kPanelW - kPad, lineY + kLineH);
