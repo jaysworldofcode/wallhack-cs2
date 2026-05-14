@@ -176,9 +176,8 @@ void Renderer::DrawEntity(const EntityData& entity,
 {
     // ── Colour scheme ─────────────────────────────────────────────────────────
     // Red for enemies, green for teammates.  Full opacity.
-    D2D1_COLOR_F boxColour = isEnemy
-        ? D2D1::ColorF(1.0f, 0.27f, 0.27f, 1.0f)   // #FF4545
-        : D2D1::ColorF(0.27f, 1.0f, 0.27f, 1.0f);  // #45FF45
+    D2D1_COLOR_F boxColour = D2D1::ColorF(0.27f, 1.0f, 0.27f, 1.0f);  // #45FF45 green
+    (void)isEnemy;
 
     m_brush->SetColor(boxColour);
 
