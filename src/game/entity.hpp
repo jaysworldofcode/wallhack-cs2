@@ -76,5 +76,11 @@ private:
 
     /// Reads one CCSPlayerController at `controllerAddr`, resolves the pawn,
     /// and populates `out`.  Returns false if the entity should be skipped.
-    bool ReadController(uintptr_t controllerAddr, EntityData& out) const;
+    bool ReadController(uintptr_t controllerAddr,
+                        uintptr_t chunkArrayAddr,
+                        EntityData& out) const;
+
+    /// Resolve a CEntityInstance* from a chunk array and entity index.
+    /// Validates the handle stored in the identity slot before returning.
+    uintptr_t GetEntityByIndex(uintptr_t chunkArrayAddr, int index) const;
 };

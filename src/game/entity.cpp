@@ -1,7 +1,7 @@
 #include "entity.hpp"
 #include "../memory/memory.hpp"
 
-#include <array>
+#include <algorithm>
 #include <cstring>  // memset
 
 // ── EntityManager::Init ───────────────────────────────────────────────────────
@@ -13,6 +13,42 @@ void EntityManager::Init(HANDLE hProcess, uintptr_t clientBase)
     m_entities.reserve(64);
 }
 
+// ── EntityManager::GetEntityByIndex ───────────────────────────────────────────
+
+uintptr_t EntityManager::GetEntityByIndex(uintptr_t chunkArrayAddr, int index) const
+{
+    if (index <= 0)
+        return 0;
+
+    const int chunkIdx = index / Offsets::EntityList::kChunkSize;
+    const int slotIdx  = index % Offsets::EntityList::kChunkSize;
+
+    uintptr_t chunkPtr = Memory::Read<uintptr_t>(
+        m_hProcess,
+        chunkArrayAddr + static_cast<uintptr_t>(chunkIdx) * sizeof(uintptr_t)
+    );
+    if (!chunkPtr)
+        return 0;
+
+    uintptr_t identityAddr = chunkPtr + slotIdx * Offsets::EntityIdentity::kStride;
+
+    uint32_t handle = Memory::Read<uint32_t>(
+        m_hProcess,
+        identityAddr + Offsets::EntityIdentity::pHandle
+    );
+    if (handle == 0 || handle == 0xFFFFFFFF)
+        return 0;
+
+    // Stale / recycled slots keep a handle whose index does not match the slot.
+    if (Offsets::HandleToIndex(handle) != index)
+        return 0;
+
+    return Memory::Read<uintptr_t>(
+        m_hProcess,
+        identityAddr + Offsets::EntityIdentity::pEntity
+    );
+}
+
 // ── EntityManager::Update ─────────────────────────────────────────────────────
 
 bool EntityManager::Update()
@@ -20,7 +56,7 @@ bool EntityManager::Update()
     m_entities.clear();
 
     // ── 1. Resolve the entity list pointer ────────────────────────────────────
-    //
+  //
     //   client.dll + dwEntityList  →  CGameEntitySystem*
     //   CGameEntitySystem + 0x10   →  chunk pointer array (inline, NOT a ptr-to-ptr)
     //
@@ -38,8 +74,6 @@ bool EntityManager::Update()
         return false;
     }
 
-    // The chunk array is EMBEDDED at +0x10 inside CGameEntitySystem — do NOT
-    // dereference it a second time.  Just add the offset.
     uintptr_t chunkArrayAddr = entitySystemAddr + Offsets::EntityList::pChunks;
 
     // ── 2. Resolve the local player's team ───────────────────────────────────
@@ -49,98 +83,67 @@ bool EntityManager::Update()
         m_clientBase + Offsets::Client::dwLocalPlayer
     );
 
-    uint32_t localPawnHandle = 0;
-    uintptr_t localPawnAddr  = 0;
+    uintptr_t localPawnAddr = 0;
 
     if (localControllerAddr)
     {
-        // Read the pawn handle from the local controller.
-        localPawnHandle = Memory::Read<uint32_t>(
+        uint32_t localPawnHandle = Memory::Read<uint32_t>(
             m_hProcess,
             localControllerAddr + Offsets::Controller::m_hPlayerPawn
         );
         int localPawnIdx = Offsets::HandleToIndex(localPawnHandle);
+        localPawnAddr = GetEntityByIndex(chunkArrayAddr, localPawnIdx);
 
-        // Resolve the pawn address from the entity list.
-        int chunkIdx = localPawnIdx / Offsets::EntityList::kChunkSize;
-        int slotIdx  = localPawnIdx % Offsets::EntityList::kChunkSize;
-
-        uintptr_t chunkPtr = Memory::Read<uintptr_t>(
-            m_hProcess,
-            chunkArrayAddr + chunkIdx * sizeof(uintptr_t)
-        );
-        if (chunkPtr)
+        if (localPawnAddr)
         {
-            uintptr_t localPawnIdentity = chunkPtr + slotIdx * Offsets::EntityIdentity::kStride;
-            localPawnAddr = Memory::Read<uintptr_t>(
+            m_localTeam = static_cast<int>(Memory::Read<uint8_t>(
                 m_hProcess,
-                localPawnIdentity + Offsets::EntityIdentity::pObject
-            );
-            if (localPawnAddr)
-            {
-                m_localTeam = static_cast<int>(Memory::Read<uint8_t>(
-                    m_hProcess,
-                    localPawnAddr + Offsets::Pawn::m_iTeamNum
-                ));
-            }
+                localPawnAddr + Offsets::Pawn::m_iTeamNum
+            ));
         }
     }
 
-    // Also read team directly from controller (C_BaseEntity::m_iTeamNum inherited)
     uint8_t ctrlTeam = localControllerAddr
         ? Memory::Read<uint8_t>(m_hProcess, localControllerAddr + Offsets::Pawn::m_iTeamNum)
         : 0;
 
-    // ── 3. Scan ALL chunks for player PAWNS ──────────────────────────────────
+    // ── 3. Walk player controllers (indices 1..64) ───────────────────────────
     //
-    // Scan up to 8 chunks (entity indices 0-4095) to find all player pawns.
-    // Validate by team (2=T, 3=CT) and a valid scene node.
-    // Dormancy is NOT filtered — ESP should show enemies through walls.
+    // Each connected player owns a CCSPlayerController in the entity list.
+    // Resolving pawns via m_hPlayerPawn is far more reliable than scanning
+    // every chunk slot for team 2/3 objects (which picks up unrelated entities).
     //
-    int nRaw = 0, nNoTeam = 0, nNoScene = 0;
-    for (int chunk = 0; chunk < 8; ++chunk)
+    int nControllers = 0, nResolved = 0;
+    for (int idx = 1; idx <= Offsets::EntityList::kMaxPlayerSlots; ++idx)
     {
-        uintptr_t chunkPtr = Memory::Read<uintptr_t>(
-            m_hProcess, chunkArrayAddr + chunk * sizeof(uintptr_t));
-        if (!chunkPtr) continue;
+        uintptr_t controllerAddr = GetEntityByIndex(chunkArrayAddr, idx);
+        if (!controllerAddr)
+            continue;
 
-        for (int slot = 0; slot < Offsets::EntityList::kChunkSize; ++slot)
-        {
-            uintptr_t identityAddr = chunkPtr + slot * Offsets::EntityIdentity::kStride;
-            uintptr_t pawnAddr = Memory::Read<uintptr_t>(
-                m_hProcess, identityAddr + Offsets::EntityIdentity::pObject);
-            if (!pawnAddr) continue;
-            if (pawnAddr == localPawnAddr) continue; // skip self
+        uint32_t pawnHandle = Memory::Read<uint32_t>(
+            m_hProcess,
+            controllerAddr + Offsets::Controller::m_hPlayerPawn
+        );
+        if (pawnHandle == 0 || pawnHandle == 0xFFFFFFFF)
+            continue;   // not a player controller
 
-            ++nRaw;
+        ++nControllers;
 
-            // Must be a player team
-            uint8_t team = Memory::Read<uint8_t>(m_hProcess, pawnAddr + Offsets::Pawn::m_iTeamNum);
-            if (team != 2 && team != 3) { ++nNoTeam; continue; }
+        EntityData data;
+        if (!ReadController(controllerAddr, chunkArrayAddr, data))
+            continue;
 
-            // Must have a valid scene node for position
-            uintptr_t sceneNode = Memory::Read<uintptr_t>(
-                m_hProcess, pawnAddr + Offsets::Pawn::m_pGameSceneNode);
-            if (!sceneNode) { ++nNoScene; continue; }
+        if (data.pawnAddress == localPawnAddr)
+            continue;
 
-            int32_t health = Memory::Read<int32_t>(m_hProcess, pawnAddr + Offsets::Pawn::m_iHealth);
-
-            EntityData data;
-            data.pawnAddress = pawnAddr;
-            data.alive  = (Memory::Read<uint8_t>(m_hProcess, pawnAddr + Offsets::Pawn::m_lifeState) == 0);
-            data.team   = static_cast<int>(team);
-            data.health = health;
-            data.origin = Memory::Read<Vec3>(
-                m_hProcess, sceneNode + Offsets::GameSceneNode::m_vecAbsOrigin);
-            data.name   = "";
-            m_entities.push_back(data);
-        }
+        ++nResolved;
+        m_entities.push_back(std::move(data));
     }
 
     wchar_t buf[192];
-    swprintf_s(buf, L"cTm=%d raw=%d nt=%d ns=%d ps=%d",
+    swprintf_s(buf, L"cTm=%d ctrl=%d ok=%d ps=%d",
         (int)ctrlTeam,
-        nRaw, nNoTeam, nNoScene, (int)m_entities.size());
+        nControllers, nResolved, (int)m_entities.size());
     m_debugLine = buf;
     return true;
 }
@@ -148,82 +151,46 @@ bool EntityManager::Update()
 // ── EntityManager::ReadController ─────────────────────────────────────────────
 
 bool EntityManager::ReadController(uintptr_t controllerAddr,
+                                   uintptr_t chunkArrayAddr,
                                    EntityData& out) const
 {
-    // ── a. Resolve pawn address via handle ────────────────────────────────────
-
     uint32_t pawnHandle = Memory::Read<uint32_t>(
         m_hProcess,
         controllerAddr + Offsets::Controller::m_hPlayerPawn
     );
     if (pawnHandle == 0xFFFFFFFF || pawnHandle == 0)
-        return false;  // invalid handle (slot unused)
+        return false;
 
-    int pawnIdx   = Offsets::HandleToIndex(pawnHandle);
-    int chunkIdx  = pawnIdx / Offsets::EntityList::kChunkSize;
-    int slotIdx   = pawnIdx % Offsets::EntityList::kChunkSize;
+    int pawnIdx = Offsets::HandleToIndex(pawnHandle);
+    uintptr_t pawnAddr = GetEntityByIndex(chunkArrayAddr, pawnIdx);
+    if (!pawnAddr)
+        return false;
 
-    // Re-read the chunk array root each call (inexpensive; avoids stale ptr).
-    uintptr_t entitySystemAddr = Memory::Read<uintptr_t>(
-        m_hProcess,
-        m_clientBase + Offsets::Client::dwEntityList
-    );
-    // Chunk array is embedded at +0x10 — direct offset, no extra dereference.
-    uintptr_t chunkArray = entitySystemAddr + Offsets::EntityList::pChunks;
-    uintptr_t chunk = Memory::Read<uintptr_t>(
-        m_hProcess,
-        chunkArray + chunkIdx * sizeof(uintptr_t)
-    );
-    if (!chunk) return false;
-
-    // Each slot is a CEntityIdentity struct (0x78 bytes). The pawn object
-    // pointer is at offset 0x10 within the struct.
-    uintptr_t pawnIdentity = chunk + slotIdx * Offsets::EntityIdentity::kStride;
-    uintptr_t pawnAddr = Memory::Read<uintptr_t>(
-        m_hProcess,
-        pawnIdentity + Offsets::EntityIdentity::pObject
-    );
-    if (!pawnAddr) return false;
-
-    // ── b. Dormancy check ─────────────────────────────────────────────────────
-    // In CS2, m_bDormant is on CGameSceneNode, not on the pawn directly.
     uintptr_t sceneNode = Memory::Read<uintptr_t>(
         m_hProcess, pawnAddr + Offsets::Pawn::m_pGameSceneNode);
-    if (!sceneNode) return false;
+    if (!sceneNode)
+        return false;
 
-    bool dormant = Memory::Read<bool>(
-        m_hProcess, sceneNode + Offsets::GameSceneNode::m_bDormant);
-    if (dormant) return false;
-
-    // ── c. Life state ─────────────────────────────────────────────────────────
     uint8_t lifeState = Memory::Read<uint8_t>(
         m_hProcess,
         pawnAddr + Offsets::Pawn::m_lifeState
     );
-    // 0 = alive; anything else = dying / dead — skip.
-    if (lifeState != 0) return false;
-
-    // ── d. Read vital fields ──────────────────────────────────────────────────
 
     out.pawnAddress = pawnAddr;
-    out.alive       = true;
-
-    out.team = static_cast<int>(
+    out.alive       = (lifeState == 0);
+    out.team        = static_cast<int>(
         Memory::Read<uint8_t>(m_hProcess, pawnAddr + Offsets::Pawn::m_iTeamNum));
-
-    out.health = Memory::Read<int32_t>(
+    out.health      = Memory::Read<int32_t>(
         m_hProcess, pawnAddr + Offsets::Pawn::m_iHealth);
-
-    out.origin = Memory::Read<Vec3>(
+    out.origin      = Memory::Read<Vec3>(
         m_hProcess, sceneNode + Offsets::GameSceneNode::m_vecAbsOrigin);
 
-    // ── e. Player name (from controller, not pawn) ────────────────────────────
     char nameBuf[128]{};
     ReadProcessMemory(
         m_hProcess,
         reinterpret_cast<LPCVOID>(controllerAddr + Offsets::Controller::m_iszPlayerName),
         nameBuf,
-        sizeof(nameBuf) - 1,  // always keep null terminator
+        sizeof(nameBuf) - 1,
         nullptr
     );
     out.name = nameBuf;

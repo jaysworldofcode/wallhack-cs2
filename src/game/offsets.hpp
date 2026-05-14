@@ -38,15 +38,17 @@ namespace Client
 }
 
 // ── CEntityIdentity (entity list entry) ──────────────────────────────────────
-// In CS2 (Source 2), the entity list chunks hold CEntityIdentity *structs*
-// contiguously — they are NOT arrays of pointers.  Each struct is 0x78 bytes.
+// In CS2 (Source 2), each chunk holds CEntityIdentity structs contiguously.
+// Layout (see CounterStrikeSharp EntitySystem):
+//   +0x00  CEntityInstance*  (the live entity object)
+//   +0x10  CEntityHandle     (must match the slot index before trusting +0x00)
 namespace EntityIdentity
 {
-    // Offset of the entity C++ object pointer within CEntityIdentity.
-    constexpr uintptr_t pObject = 0x10;
+    constexpr uintptr_t pEntity = 0x00;
+    constexpr uintptr_t pHandle = 0x10;
 
     // sizeof(CEntityIdentity) — stride between consecutive entries in a chunk.
-    constexpr int kStride = 0x78;
+    constexpr int kStride = 0x70;
 }
 
 // ── CEntitySystem / IEntityList chunk layout ──────────────────────────────────
@@ -58,9 +60,10 @@ namespace EntityIdentity
 // chunk array base as:  entitySystemAddr + pChunks  (no extra Read<ptr>).
 namespace EntityList
 {
-    constexpr uintptr_t pChunks       = 0x10;   // inline chunk-ptr array start within CGameEntitySystem
-    constexpr int       kChunkSize    = 512;     // entities per chunk
-    constexpr int       kMaxEntities  = 512;     // full chunk scan (512 entities per chunk)
+    constexpr uintptr_t pChunks              = 0x10;   // inline chunk-ptr array start within CGameEntitySystem
+    constexpr uintptr_t highestEntityIndex   = 0x2090; // int32 — last used entity index
+    constexpr int       kChunkSize           = 512;    // entities per chunk
+    constexpr int       kMaxPlayerSlots      = 64;     // CS2 player controller slots
 }
 
 // ── CCSPlayerController ───────────────────────────────────────────────────────
