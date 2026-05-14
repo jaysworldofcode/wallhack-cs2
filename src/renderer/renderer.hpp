@@ -34,6 +34,9 @@ public:
     /// Initialize Direct2D and bind to an existing HWND.
     bool Init(HWND hwnd, int width, int height);
 
+    /// Resize the D2D render target to match a new resolution.
+    void Resize(int width, int height);
+
     /// Release all Direct2D resources.
     void Shutdown();
 
@@ -63,8 +66,9 @@ public:
     void DrawDebugHUD(bool attached, int entityCount, const std::wstring& diagLine = {});
 
     /// Draw the toggleable overlay menu panel (INSERT key).
+    /// @param resLabel  Current resolution string shown in the panel (e.g. "1920x1080").
     /// When visible = false the function is a no-op.
-    void DrawMenu(bool visible);
+    void DrawMenu(bool visible, const wchar_t* resLabel);
 
     /// Draw a persistent "Developed by JayLord" watermark in the bottom-right.
     void DrawWatermark();

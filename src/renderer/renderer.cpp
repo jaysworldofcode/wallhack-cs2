@@ -123,6 +123,16 @@ void Renderer::ReleaseDeviceResources()
     m_renderTarget.Reset();
 }
 
+// ── Renderer::Resize ─────────────────────────────────────────────────────────
+
+void Renderer::Resize(int width, int height)
+{
+    m_width  = width;
+    m_height = height;
+    ReleaseDeviceResources();
+    CreateDeviceResources();
+}
+
 // ── Renderer::Shutdown ────────────────────────────────────────────────────────
 
 void Renderer::Shutdown()
@@ -408,14 +418,14 @@ void Renderer::DrawDebugHUD(bool attached, int entityCount, const std::wstring& 
 // Semi-transparent panel shown when the user presses INSERT.
 // Displays feature state and basic key hints.
 
-void Renderer::DrawMenu(bool visible)
+void Renderer::DrawMenu(bool visible, const wchar_t* resLabel)
 {
     if (!visible) return;
 
     constexpr float kPanelX = 20.f;
     constexpr float kPanelY = 40.f;
-    constexpr float kPanelW = 210.f;
-    constexpr float kPanelH = 120.f;
+    constexpr float kPanelW = 230.f;
+    constexpr float kPanelH = 140.f;
     constexpr float kPad    = 10.f;
     constexpr float kLineH  = 18.f;
 
@@ -460,7 +470,19 @@ void Renderer::DrawMenu(bool visible)
         float lineY = divY + 6.f;
         D2D1_RECT_F r = D2D1::RectF(kPanelX + kPad, lineY,
                                      kPanelX + kPanelW - kPad, lineY + kLineH);
-        m_brush->SetColor(D2D1::ColorF(0.27f, 1.0f, 0.27f, 1.f));   // green = on
+        m_brush->SetColor(D2D1::ColorF(0.27f, 1.0f, 0.27f, 1.f));
+        m_renderTarget->DrawText(line, static_cast<UINT32>(wcslen(line)),
+            m_menuTextFormat.Get(), r, m_brush.Get());
+    }
+
+    // ── Resolution line ───────────────────────────────────────────────────────
+    {
+        wchar_t line[64];
+        swprintf_s(line, L"\u25C4 Res: %s \u25BA", resLabel ? resLabel : L"?");
+        float lineY = divY + 26.f;
+        D2D1_RECT_F r = D2D1::RectF(kPanelX + kPad, lineY,
+                                     kPanelX + kPanelW - kPad, lineY + kLineH);
+        m_brush->SetColor(D2D1::ColorF(0.9f, 0.75f, 0.2f, 1.f));   // amber
         m_renderTarget->DrawText(line, static_cast<UINT32>(wcslen(line)),
             m_menuTextFormat.Get(), r, m_brush.Get());
     }
@@ -468,7 +490,7 @@ void Renderer::DrawMenu(bool visible)
     // ── Credit ────────────────────────────────────────────────────────────────
     {
         const wchar_t* credit = L"Developed by JayLord";
-        float lineY = divY + 28.f;
+        float lineY = divY + 48.f;
         D2D1_RECT_F r = D2D1::RectF(kPanelX + kPad, lineY,
                                      kPanelX + kPanelW - kPad, lineY + kLineH);
         m_shadowBrush->SetOpacity(0.8f);
@@ -483,7 +505,7 @@ void Renderer::DrawMenu(bool visible)
 
     // ── Hint ──────────────────────────────────────────────────────────────────
     {
-        const wchar_t* hint = L"[INSERT] Toggle  |  [END] Exit";
+        const wchar_t* hint = L"[←→] Res  [INS] Toggle  [END] Exit";
         float lineY = kPanelY + kPanelH - kLineH - 6.f;
         D2D1_RECT_F r = D2D1::RectF(kPanelX + kPad, lineY,
                                      kPanelX + kPanelW - kPad, lineY + kLineH);

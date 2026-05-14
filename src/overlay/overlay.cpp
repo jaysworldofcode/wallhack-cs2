@@ -72,6 +72,17 @@ bool Overlay::Create(int width, int height, std::wstring_view title)
     return true;
 }
 
+// ── Overlay::Resize ───────────────────────────────────────────────────────────
+
+void Overlay::Resize(int width, int height)
+{
+    m_width  = width;
+    m_height = height;
+    if (m_hwnd)
+        SetWindowPos(m_hwnd, nullptr, 0, 0, width, height,
+                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
 // ── Overlay::Destroy ──────────────────────────────────────────────────────────
 
 void Overlay::Destroy()

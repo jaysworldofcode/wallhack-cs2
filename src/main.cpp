@@ -61,11 +61,30 @@
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 
-static constexpr int   kOverlayWidth   = 1920;  // match your game resolution
-static constexpr int   kOverlayHeight  = 1080;
-static constexpr float kTargetFPS      = 60.f;
-static constexpr int   kFrameBudgetMs  =
+static constexpr float kTargetFPS     = 60.f;
+static constexpr int   kFrameBudgetMs =
     static_cast<int>(1000.f / kTargetFPS);  // ~16 ms per frame
+
+// ── Resolution presets ────────────────────────────────────────────────────────
+
+struct Resolution { int w; int h; const wchar_t* label; };
+
+static constexpr Resolution kResolutions[] = {
+    { 1024,  768, L"1024x768"  },
+    { 1280,  720, L"1280x720"  },
+    { 1280,  960, L"1280x960"  },
+    { 1366,  768, L"1366x768"  },
+    { 1440,  900, L"1440x900"  },
+    { 1600,  900, L"1600x900"  },
+    { 1920, 1080, L"1920x1080" },
+    { 2560, 1440, L"2560x1440" },
+    { 3840, 2160, L"3840x2160" },
+};
+static constexpr int kResCount = static_cast<int>(
+    sizeof(kResolutions) / sizeof(kResolutions[0]));
+
+// Default to 1920x1080
+static int gResIdx = 6;
 
 // ── WinMain ───────────────────────────────────────────────────────────────────
 
@@ -101,7 +120,7 @@ int WINAPI WinMain(
     // ── 2. Create overlay window ──────────────────────────────────────────────
 
     Overlay overlay;
-    if (!overlay.Create(kOverlayWidth, kOverlayHeight, L"CS2 Overlay"))
+    if (!overlay.Create(kResolutions[gResIdx].w, kResolutions[gResIdx].h, L"CS2 Overlay"))
     {
         MessageBoxW(nullptr, L"Failed to create overlay window.",
                     L"Overlay — Window Error", MB_ICONERROR | MB_OK);
@@ -112,7 +131,9 @@ int WINAPI WinMain(
     // ── 3. Initialise renderer ────────────────────────────────────────────────
 
     Renderer renderer;
-    if (!renderer.Init(overlay.Hwnd(), kOverlayWidth, kOverlayHeight))
+    if (!renderer.Init(overlay.Hwnd(),
+                       kResolutions[gResIdx].w,
+                       kResolutions[gResIdx].h))
     {
         MessageBoxW(nullptr, L"Failed to initialise Direct2D renderer.",
                     L"Overlay — D2D Error", MB_ICONERROR | MB_OK);
@@ -129,17 +150,47 @@ int WINAPI WinMain(
     // ── 5. Main loop ──────────────────────────────────────────────────────────
 
     bool menuVisible  = false;  // toggled by INSERT key
-    bool prevInsert   = false;  // for edge-detection (avoid repeat while held)
+    bool prevInsert   = false;  // edge-detection for INSERT
+    bool prevLeft     = false;  // edge-detection for LEFT arrow
+    bool prevRight    = false;  // edge-detection for RIGHT arrow
 
     while (true)
     {
         const auto frameStart = std::chrono::steady_clock::now();
 
-        // ── INSERT key: toggle menu (edge-detect so one press = one toggle) ──
+        // ── INSERT key: toggle menu ───────────────────────────────────────────
         const bool curInsert = (GetAsyncKeyState(VK_INSERT) & 0x8000) != 0;
         if (curInsert && !prevInsert)
             menuVisible = !menuVisible;
         prevInsert = curInsert;
+
+        // ── Arrow keys: cycle resolution (only while menu is open) ───────────
+        if (menuVisible)
+        {
+            const bool curLeft  = (GetAsyncKeyState(VK_LEFT)  & 0x8000) != 0;
+            const bool curRight = (GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
+
+            if (curLeft && !prevLeft)
+            {
+                gResIdx = (gResIdx - 1 + kResCount) % kResCount;
+                overlay.Resize(kResolutions[gResIdx].w, kResolutions[gResIdx].h);
+                renderer.Resize(kResolutions[gResIdx].w, kResolutions[gResIdx].h);
+            }
+            if (curRight && !prevRight)
+            {
+                gResIdx = (gResIdx + 1) % kResCount;
+                overlay.Resize(kResolutions[gResIdx].w, kResolutions[gResIdx].h);
+                renderer.Resize(kResolutions[gResIdx].w, kResolutions[gResIdx].h);
+            }
+
+            prevLeft  = curLeft;
+            prevRight = curRight;
+        }
+        else
+        {
+            prevLeft  = false;
+            prevRight = false;
+        }
 
         // Process Windows messages; exit loop on WM_QUIT.
         if (!overlay.PumpMessages())
@@ -182,7 +233,7 @@ int WINAPI WinMain(
         renderer.DrawWatermark();
 
         // Toggleable menu panel (INSERT key).
-        renderer.DrawMenu(menuVisible);
+        renderer.DrawMenu(menuVisible, kResolutions[gResIdx].label);
 
         for (const EntityData& entity : entities)
         {
@@ -190,8 +241,8 @@ int WINAPI WinMain(
             auto screenBox = GetScreenBox(
                 entity.origin,
                 viewMatrix,
-                static_cast<float>(kOverlayWidth),
-                static_cast<float>(kOverlayHeight)
+                static_cast<float>(renderer.Width()),
+                static_cast<float>(renderer.Height())
             );
 
             if (!screenBox || !screenBox->Valid())

@@ -37,6 +37,9 @@ public:
     /// @returns false if a WM_QUIT has been received (time to exit).
     bool PumpMessages();
 
+    /// Resize the overlay window to match a new game resolution.
+    void Resize(int width, int height);
+
     HWND Hwnd()   const { return m_hwnd;   }
     int  Width()  const { return m_width;  }
     int  Height() const { return m_height; }
