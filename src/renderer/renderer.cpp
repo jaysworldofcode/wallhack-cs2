@@ -170,8 +170,20 @@ void Renderer::DrawEntity(const EntityData& entity,
     // ── Draw the AABB bounding box ────────────────────────────────────────────
     DrawCornerBox(rect, m_brush.Get());
 
-    // ── Draw the HP bar ───────────────────────────────────────────────────────
-    DrawHpBar(box, entity.health);
+    // ── Draw HP number below the box ─────────────────────────────────────────
+    {
+        wchar_t hpBuf[8];
+        swprintf_s(hpBuf, L"%d", std::clamp(entity.health, 0, 999));
+        const UINT32 hpLen = static_cast<UINT32>(wcslen(hpBuf));
+        D2D1_RECT_F hpRect = D2D1::RectF(box.left, box.bottom + 2.f, box.right, box.bottom + 16.f);
+        // shadow
+        m_shadowBrush->SetOpacity(0.85f);
+        D2D1_RECT_F hpShadow = D2D1::RectF(hpRect.left+1.f, hpRect.top+1.f, hpRect.right+1.f, hpRect.bottom+1.f);
+        m_renderTarget->DrawText(hpBuf, hpLen, m_textFormat.Get(), hpShadow, m_shadowBrush.Get());
+        // coloured text (green->yellow->red)
+        m_hpFillBrush->SetColor(HpColour(entity.health));
+        m_renderTarget->DrawText(hpBuf, hpLen, m_textFormat.Get(), hpRect, m_hpFillBrush.Get());
+    }
 
     // ── Draw the player name ──────────────────────────────────────────────────
     DrawName(entity, box);

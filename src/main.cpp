@@ -183,6 +183,7 @@ int WINAPI WinMain(
                 continue;   // entity is behind the camera or off-screen
 
             const bool isEnemy = entity.IsEnemy(entityMgr.LocalTeam());
+            if (!isEnemy) continue;  // don't draw teammates
             renderer.DrawEntity(entity, *screenBox, isEnemy);
         }
 

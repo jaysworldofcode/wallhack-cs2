@@ -121,7 +121,9 @@ struct ViewMatrix
         ++projected;
     }
 
-    if (projected == 0)
+    // Require at least 4 of 8 corners to project — fewer means the entity is
+    // mostly behind the camera and the AABB would be hugely distorted.
+    if (projected < 4)
         return std::nullopt;
 
     return ScreenBox{ minX, minY, maxX, maxY };
