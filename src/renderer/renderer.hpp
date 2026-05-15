@@ -123,6 +123,9 @@ private:
     /// Draw the player's name above the box.
     void DrawName(const EntityData& entity, const ScreenBox& box);
 
+    /// Draw the player's HP as a number centred below the box.
+    void DrawHealthNumber(int health, const ScreenBox& box);
+
     /// Compute a D2D colour for a health value (green at 100, red at 0).
     static D2D1_COLOR_F HpColour(int health);
 };

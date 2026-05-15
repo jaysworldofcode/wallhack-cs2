@@ -46,6 +46,7 @@ bool Renderer::Init(HWND hwnd, int width, int height)
 
     m_textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
     m_textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+    m_textFormat->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
 
     // Left-aligned format for the menu panel and watermark.
     hr = m_dwFactory->CreateTextFormat(
@@ -195,6 +196,12 @@ void Renderer::DrawEntity(const EntityData& entity,
 
     // ── Draw the AABB bounding box ────────────────────────────────────────────
     DrawCornerBox(rect, m_brush.Get());
+
+    // ── Player name (above box) ───────────────────────────────────────────────
+    DrawName(entity, box);
+
+    // ── Health number (below box) ─────────────────────────────────────────────
+    DrawHealthNumber(entity.health, box);
 }
 
 // ── Renderer::DrawCornerBox ───────────────────────────────────────────────────
@@ -289,11 +296,13 @@ void Renderer::DrawName(const EntityData& entity, const ScreenBox& box)
     std::wstring wname(static_cast<size_t>(wlen - 1), L'\0');
     MultiByteToWideChar(CP_UTF8, 0, entity.name.c_str(), -1, wname.data(), wlen);
 
-    // Label rect: horizontally centred above the box.
+    // Label rect: fixed width centred on the box so narrow boxes don't wrap text.
+    const float cx = (box.left + box.right) * 0.5f;
+    constexpr float kLabelW = 120.f;
     D2D1_RECT_F labelRect = D2D1::RectF(
-        box.left,
-        box.top - 14.f - kNameOffsetY,  // 14 ≈ one line of 11pt text
-        box.right,
+        cx - kLabelW * 0.5f,
+        box.top - 14.f - kNameOffsetY,
+        cx + kLabelW * 0.5f,
         box.top - kNameOffsetY
     );
 
@@ -314,6 +323,43 @@ void Renderer::DrawName(const EntityData& entity, const ScreenBox& box)
         wname.c_str(), static_cast<UINT32>(wname.size()),
         m_textFormat.Get(), labelRect, m_brush.Get()
     );
+}
+
+// ── Renderer::DrawHealthNumber ────────────────────────────────────────────────
+//
+// Renders the player's HP as a plain integer (e.g. "87") centred just below
+// the bottom edge of the bounding box.  Colour matches the HP bar gradient
+// (green → yellow → red) so the two elements are visually consistent.
+
+void Renderer::DrawHealthNumber(int health, const ScreenBox& box)
+{
+    wchar_t buf[8];
+    swprintf_s(buf, L"%d", std::clamp(health, 0, 100));
+    const UINT32 len = static_cast<UINT32>(wcslen(buf));
+
+    constexpr float kLabelH  = 13.f;   // single-line text height (px)
+    constexpr float kGapY    = 2.f;    // gap between box bottom and text top
+    constexpr float kNumW    = 40.f;   // fixed width — enough for "100" at 11pt
+
+    const float cx = (box.left + box.right) * 0.5f;
+    D2D1_RECT_F labelRect = D2D1::RectF(
+        cx - kNumW * 0.5f,
+        box.bottom + kGapY,
+        cx + kNumW * 0.5f,
+        box.bottom + kGapY + kLabelH
+    );
+
+    // Drop shadow (1 px offset)
+    m_shadowBrush->SetOpacity(0.85f);
+    D2D1_RECT_F shadowRect = D2D1::RectF(
+        labelRect.left  + 1.f, labelRect.top    + 1.f,
+        labelRect.right + 1.f, labelRect.bottom + 1.f
+    );
+    m_renderTarget->DrawText(buf, len, m_textFormat.Get(), shadowRect, m_shadowBrush.Get());
+
+    // Foreground — same colour as the HP bar
+    m_brush->SetColor(HpColour(health));
+    m_renderTarget->DrawText(buf, len, m_textFormat.Get(), labelRect, m_brush.Get());
 }
 
 // ── Renderer::HpColour ───────────────────────────────────────────────────────
