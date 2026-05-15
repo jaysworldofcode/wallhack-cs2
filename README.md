@@ -91,28 +91,6 @@ The default is **1920×1080** (index 6). Your selection resets when you restart 
 
 ---
 
-## Updating Offsets
-
-CS2 patches regularly shift memory offsets. When the overlay stops working after a game update:
-
-1. Grab the latest dump from [a2x/cs2-dumper](https://github.com/a2x/cs2-dumper).
-2. Open `src/game/offsets.hpp`.
-3. Update the three global pointers in the `Client` namespace:
-
-```cpp
-namespace Client {
-    constexpr uintptr_t dwEntityList  = /* new value from offsets.hpp → dwEntityList  */;
-    constexpr uintptr_t dwLocalPlayer = /* new value from offsets.hpp → dwLocalPlayerController */;
-    constexpr uintptr_t dwViewMatrix  = /* new value from offsets.hpp → dwViewMatrix  */;
-}
-```
-
-4. Rebuild (`cmake --build build --config Release`).
-
-Struct-level offsets (`m_iHealth`, `m_pGameSceneNode`, etc.) rarely change and are sourced from `client_dll.cs` in the same repo.
-
----
-
 ## Project Structure
 
 ```
@@ -148,7 +126,7 @@ The game is still loading. Wait until you are fully in a match before launching 
 Your in-game resolution does not match the overlay resolution. Open the menu (`INSERT`) and cycle presets until they align.
 
 **Debug HUD shows yellow dot / 0 entities**  
-The offsets are stale. Update `src/game/offsets.hpp` with the latest values from [a2x/cs2-dumper](https://github.com/a2x/cs2-dumper) and rebuild.
+The overlay may be out of date. Check for a newer release.
 
 **Overlay window is blank / black**  
 Direct2D device creation failed. Ensure your GPU drivers are up to date and that the Windows 10 SDK is installed.
