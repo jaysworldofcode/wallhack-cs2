@@ -183,61 +183,163 @@ void Renderer::EndFrame()
 
 void Renderer::DrawEntity(const EntityData& entity,
                           const ScreenBox&  box,
-                          bool              isEnemy)
+                          bool              isEnemy,
+                          const ViewMatrix& vm,
+                          const Features&   feat)
 {
-    // ── Colour scheme ─────────────────────────────────────────────────────────
-    // Red for enemies, green for teammates.  Full opacity.
-    D2D1_COLOR_F boxColour = D2D1::ColorF(0.27f, 1.0f, 0.27f, 1.0f);  // #45FF45 green
     (void)isEnemy;
+    (void)vm;
 
-    m_brush->SetColor(boxColour);
+    m_brush->SetColor(D2D1::ColorF(0.27f, 1.0f, 0.27f, 1.0f));
 
-    D2D1_RECT_F rect = D2D1::RectF(box.left, box.top, box.right, box.bottom);
+    if (feat.showBox)
+        DrawCornerBox(D2D1::RectF(box.left, box.top, box.right, box.bottom), m_brush.Get());
 
-    // ── Draw the AABB bounding box ────────────────────────────────────────────
-    DrawCornerBox(rect, m_brush.Get());
+    if (feat.showWeapon)
+        DrawWeaponName(entity, box);
 
-    // ── Player name (above box) ───────────────────────────────────────────────
-    DrawName(entity, box);
+    if (feat.showName)
+        DrawName(entity, box);
 
-    // ── Health number (below box) ─────────────────────────────────────────────
-    DrawHealthNumber(entity.health, box);
+    if (feat.showHealth)
+        DrawHealthNumber(entity.health, box);
 }
 
 // ── Renderer::DrawCornerBox ───────────────────────────────────────────────────
-//
-// Corner brackets are a common ESP aesthetic: four L-shaped strokes at the
-// corners instead of a full rectangle outline, reducing visual clutter at
-// range.  The bracket arm length is 1/5 of the box dimension.
 
 void Renderer::DrawCornerBox(const D2D1_RECT_F& r, ID2D1Brush* brush)
 {
-    const float armX = (r.right  - r.left) * 0.20f;
-    const float armY = (r.bottom - r.top)  * 0.20f;
+    const float armX = (r.right  - r.left) * 0.22f;
+    const float armY = (r.bottom - r.top)  * 0.22f;
 
     auto Line = [&](float x0, float y0, float x1, float y1) {
         m_renderTarget->DrawLine(
-            D2D1::Point2F(x0, y0),
-            D2D1::Point2F(x1, y1),
-            brush, kBoxStroke
-        );
+            D2D1::Point2F(x0, y0), D2D1::Point2F(x1, y1),
+            brush, kBoxStroke);
     };
 
     // Top-left
-    Line(r.left,         r.top,          r.left + armX,  r.top);
-    Line(r.left,         r.top,          r.left,          r.top + armY);
-
+    Line(r.left,         r.top,           r.left + armX,  r.top);
+    Line(r.left,         r.top,           r.left,          r.top + armY);
     // Top-right
-    Line(r.right - armX, r.top,          r.right,         r.top);
-    Line(r.right,        r.top,          r.right,         r.top + armY);
-
+    Line(r.right - armX, r.top,           r.right,         r.top);
+    Line(r.right,        r.top,           r.right,         r.top + armY);
     // Bottom-left
     Line(r.left,         r.bottom - armY, r.left,          r.bottom);
     Line(r.left,         r.bottom,        r.left + armX,   r.bottom);
-
     // Bottom-right
     Line(r.right,        r.bottom - armY, r.right,         r.bottom);
     Line(r.right - armX, r.bottom,        r.right,         r.bottom);
+}
+
+// ── Renderer::DrawSkeleton ────────────────────────────────────────────────────
+//
+// Projects each bone's world position to screen space and draws lines between
+// connected joints.  Bones that project behind the camera are skipped for that
+// limb segment — the rest of the skeleton still renders cleanly.
+//
+// Bone connections:
+//   Head  → Neck  → Chest → Spine → Pelvis
+//   Chest → L/R Shoulder → Elbow → Wrist
+//   Pelvis → L/R Hip → Knee → Ankle
+
+void Renderer::DrawSkeleton(const EntityData& entity, const ViewMatrix& vm)
+{
+    if (!entity.hasBones) return;
+
+    const float sw = static_cast<float>(m_width);
+    const float sh = static_cast<float>(m_height);
+
+    // Project all bones into a screen-space array indexed by bone ID.
+    // Entries that are behind the camera remain as std::nullopt.
+    using OptPt = std::optional<D2D1_POINT_2F>;
+    std::array<OptPt, Offsets::Bones::kCount> pt{};
+    for (int i = 0; i < Offsets::Bones::kCount; ++i)
+    {
+        auto s = WorldToScreen(entity.bones[i], vm, sw, sh);
+        if (s) pt[i] = D2D1::Point2F(s->x, s->y);
+    }
+
+    constexpr float kStroke     = 1.0f;
+    constexpr float kJointR     = 1.5f;  // radius of joint dots
+    constexpr float kHeadR      = 4.5f;  // radius of head circle
+
+    // Green for bones, slightly dimmer shadow for readability.
+    const D2D1_COLOR_F kBoneCol   = D2D1::ColorF(0.27f, 1.0f, 0.27f, 1.0f);
+    const D2D1_COLOR_F kShadowCol = D2D1::ColorF(0.f,   0.f,  0.f,  0.6f);
+
+    namespace OB = Offsets::Bones;
+
+    // Draw a bone line with a 1-px dark shadow for contrast.
+    auto Bone = [&](int a, int b)
+    {
+        if (!pt[a] || !pt[b]) return;
+        m_shadowBrush->SetColor(kShadowCol);
+        m_renderTarget->DrawLine(
+            D2D1::Point2F(pt[a]->x + 1.f, pt[a]->y + 1.f),
+            D2D1::Point2F(pt[b]->x + 1.f, pt[b]->y + 1.f),
+            m_shadowBrush.Get(), kStroke);
+        m_brush->SetColor(kBoneCol);
+        m_renderTarget->DrawLine(*pt[a], *pt[b], m_brush.Get(), kStroke);
+    };
+
+    // Draw a small filled dot at a joint position.
+    auto Joint = [&](int i)
+    {
+        if (!pt[i]) return;
+        m_brush->SetColor(kBoneCol);
+        m_renderTarget->FillEllipse(
+            D2D1::Ellipse(*pt[i], kJointR, kJointR), m_brush.Get());
+    };
+
+    // ── Spine ─────────────────────────────────────────────────────────────────
+    Bone(OB::NECK,  OB::CHEST);
+    Bone(OB::CHEST, OB::SPINE);
+    Bone(OB::SPINE, OB::PELVIS);
+
+    // ── Left arm ──────────────────────────────────────────────────────────────
+    Bone(OB::CHEST,     OB::LSHOULDER);
+    Bone(OB::LSHOULDER, OB::LELBOW);
+    Bone(OB::LELBOW,    OB::LWRIST);
+
+    // ── Right arm ─────────────────────────────────────────────────────────────
+    Bone(OB::CHEST,     OB::RSHOULDER);
+    Bone(OB::RSHOULDER, OB::RELBOW);
+    Bone(OB::RELBOW,    OB::RWRIST);
+
+    // ── Left leg ──────────────────────────────────────────────────────────────
+    Bone(OB::PELVIS, OB::LHIP);
+    Bone(OB::LHIP,   OB::LKNEE);
+    Bone(OB::LKNEE,  OB::LANKLE);
+
+    // ── Right leg ─────────────────────────────────────────────────────────────
+    Bone(OB::PELVIS, OB::RHIP);
+    Bone(OB::RHIP,   OB::RKNEE);
+    Bone(OB::RKNEE,  OB::RANKLE);
+
+    // ── Joints ────────────────────────────────────────────────────────────────
+    Joint(OB::LSHOULDER); Joint(OB::LELBOW); Joint(OB::LWRIST);
+    Joint(OB::RSHOULDER); Joint(OB::RELBOW); Joint(OB::RWRIST);
+    Joint(OB::LHIP);      Joint(OB::LKNEE);  Joint(OB::LANKLE);
+    Joint(OB::RHIP);      Joint(OB::RKNEE);  Joint(OB::RANKLE);
+    Joint(OB::PELVIS);    Joint(OB::CHEST);
+
+    // ── Head circle ───────────────────────────────────────────────────────────
+    if (pt[OB::HEAD])
+    {
+        // Shadow
+        m_shadowBrush->SetColor(kShadowCol);
+        m_renderTarget->DrawEllipse(
+            D2D1::Ellipse(D2D1::Point2F(pt[OB::HEAD]->x + 1.f,
+                                        pt[OB::HEAD]->y + 1.f),
+                          kHeadR, kHeadR),
+            m_shadowBrush.Get(), kStroke);
+        // Foreground
+        m_brush->SetColor(kBoneCol);
+        m_renderTarget->DrawEllipse(
+            D2D1::Ellipse(*pt[OB::HEAD], kHeadR, kHeadR),
+            m_brush.Get(), kStroke);
+    }
 }
 
 // ── Renderer::DrawHpBar ───────────────────────────────────────────────────────
@@ -323,6 +425,44 @@ void Renderer::DrawName(const EntityData& entity, const ScreenBox& box)
         wname.c_str(), static_cast<UINT32>(wname.size()),
         m_textFormat.Get(), labelRect, m_brush.Get()
     );
+}
+
+// ── Renderer::DrawWeaponName ──────────────────────────────────────────────────
+//
+// Draws the active weapon name centred above the player name label.
+// Rendered in a yellow-amber colour to distinguish it from the white name tag.
+
+void Renderer::DrawWeaponName(const EntityData& entity, const ScreenBox& box)
+{
+    const wchar_t* wname = entity.WeaponName();
+    if (!wname || wname[0] == L'\0') return;
+
+    const UINT32 len = static_cast<UINT32>(wcslen(wname));
+
+    constexpr float kLabelH  = 13.f;
+    constexpr float kLabelW  = 120.f;
+    // Sit above the name label (name is 14 + 3 px above box top, so weapon is another 14 px higher)
+    constexpr float kNameH   = 14.f + kNameOffsetY;   // same as DrawName's reserved space
+    constexpr float kGapY    = 2.f;
+
+    const float cx = (box.left + box.right) * 0.5f;
+    D2D1_RECT_F labelRect = D2D1::RectF(
+        cx - kLabelW * 0.5f,
+        box.top - kNameH - kLabelH - kGapY,
+        cx + kLabelW * 0.5f,
+        box.top - kNameH - kGapY
+    );
+
+    // Drop shadow
+    m_shadowBrush->SetOpacity(0.85f);
+    m_renderTarget->DrawText(wname, len, m_textFormat.Get(),
+        D2D1::RectF(labelRect.left + 1.f, labelRect.top + 1.f,
+                    labelRect.right + 1.f, labelRect.bottom + 1.f),
+        m_shadowBrush.Get());
+
+    // Amber / yellow foreground — easy to distinguish from the white name tag
+    m_brush->SetColor(D2D1::ColorF(1.0f, 0.85f, 0.2f, 1.0f));
+    m_renderTarget->DrawText(wname, len, m_textFormat.Get(), labelRect, m_brush.Get());
 }
 
 // ── Renderer::DrawHealthNumber ────────────────────────────────────────────────
@@ -464,22 +604,22 @@ void Renderer::DrawDebugHUD(bool attached, int entityCount, const std::wstring& 
 // Semi-transparent panel shown when the user presses INSERT.
 // Displays feature state and basic key hints.
 
-void Renderer::DrawMenu(bool visible, const wchar_t* resLabel)
+void Renderer::DrawMenu(bool visible, const wchar_t* resLabel, const Features& feat, int cursor)
 {
     if (!visible) return;
 
     constexpr float kPanelX = 20.f;
     constexpr float kPanelY = 40.f;
     constexpr float kPanelW = 230.f;
-    constexpr float kPanelH = 140.f;
+    constexpr float kPanelH = 198.f;   // taller to fit feature rows
     constexpr float kPad    = 10.f;
     constexpr float kLineH  = 18.f;
 
     D2D1_RECT_F panel = D2D1::RectF(kPanelX, kPanelY,
                                      kPanelX + kPanelW, kPanelY + kPanelH);
 
-    // Background
-    m_hpBgBrush->SetOpacity(0.80f);
+    // Background — semi-transparent so the game is visible through the panel
+    m_hpBgBrush->SetOpacity(0.45f);
     m_renderTarget->FillRectangle(panel, m_hpBgBrush.Get());
 
     // Border (cyan-ish)
@@ -510,25 +650,77 @@ void Renderer::DrawMenu(bool visible, const wchar_t* resLabel)
         D2D1::Point2F(kPanelX + kPanelW - kPad, divY),
         m_brush.Get(), 0.8f);
 
-    // ── ESP Boxes line ────────────────────────────────────────────────────────
+    // ── Feature toggle rows ───────────────────────────────────────────────────
     {
-        const wchar_t* line = L"Wallhack:  ON";
-        float lineY = divY + 6.f;
-        D2D1_RECT_F r = D2D1::RectF(kPanelX + kPad, lineY,
-                                     kPanelX + kPanelW - kPad, lineY + kLineH);
-        m_brush->SetColor(D2D1::ColorF(0.27f, 1.0f, 0.27f, 1.f));
-        m_renderTarget->DrawText(line, static_cast<UINT32>(wcslen(line)),
-            m_menuTextFormat.Get(), r, m_brush.Get());
+        struct Row { const wchar_t* label; bool state; };
+        Row rows[4] = {
+            { L"Box",    feat.showBox    },
+            { L"Name",   feat.showName   },
+            { L"Health", feat.showHealth },
+            { L"Weapon", feat.showWeapon },
+        };
+
+        for (int i = 0; i < 4; ++i)
+        {
+            float lineY = divY + 6.f + i * (kLineH + 2.f);
+            bool  sel   = (cursor == i);
+
+            // Cursor arrow
+            if (sel)
+            {
+                m_brush->SetColor(D2D1::ColorF(0.3f, 0.85f, 1.0f, 1.f));
+                const wchar_t* arrow = L"\u25BA";
+                m_renderTarget->DrawText(arrow, 1, m_menuTextFormat.Get(),
+                    D2D1::RectF(kPanelX + kPad, lineY,
+                                kPanelX + kPad + 14.f, lineY + kLineH),
+                    m_brush.Get());
+            }
+
+            // Label
+            D2D1_RECT_F labelR = D2D1::RectF(kPanelX + kPad + 14.f, lineY,
+                                              kPanelX + 140.f, lineY + kLineH);
+            m_brush->SetColor(sel
+                ? D2D1::ColorF(1.f,   1.f,  1.f,  1.f)    // bright white when selected
+                : D2D1::ColorF(0.75f, 0.75f, 0.75f, 1.f)); // dim when not selected
+            m_renderTarget->DrawText(rows[i].label,
+                static_cast<UINT32>(wcslen(rows[i].label)),
+                m_menuTextFormat.Get(), labelR, m_brush.Get());
+
+            // ON / OFF badge
+            const wchar_t* badge = rows[i].state ? L"ON" : L"OFF";
+            D2D1_RECT_F badgeR = D2D1::RectF(kPanelX + 150.f, lineY,
+                                              kPanelX + kPanelW - kPad, lineY + kLineH);
+            m_brush->SetColor(rows[i].state
+                ? D2D1::ColorF(0.27f, 1.0f, 0.27f, 1.f)
+                : D2D1::ColorF(1.0f,  0.35f, 0.35f, 1.f));
+            m_renderTarget->DrawText(badge,
+                static_cast<UINT32>(wcslen(badge)),
+                m_menuTextFormat.Get(), badgeR, m_brush.Get());
+        }
     }
 
-    // ── Resolution line ───────────────────────────────────────────────────────
+    // ── Resolution row ────────────────────────────────────────────────────────
     {
+        bool  sel   = (cursor == 4);
+        float lineY = divY + 6.f + 4 * (kLineH + 2.f) + 4.f;
+
+        if (sel)
+        {
+            m_brush->SetColor(D2D1::ColorF(0.3f, 0.85f, 1.0f, 1.f));
+            const wchar_t* arrow = L"\u25BA";
+            m_renderTarget->DrawText(arrow, 1, m_menuTextFormat.Get(),
+                D2D1::RectF(kPanelX + kPad, lineY,
+                            kPanelX + kPad + 14.f, lineY + kLineH),
+                m_brush.Get());
+        }
+
         wchar_t line[64];
-        swprintf_s(line, L"\u25C4 Res: %s \u25BA", resLabel ? resLabel : L"?");
-        float lineY = divY + 26.f;
-        D2D1_RECT_F r = D2D1::RectF(kPanelX + kPad, lineY,
+        swprintf_s(line, L"Res:  %s", resLabel ? resLabel : L"?");
+        D2D1_RECT_F r = D2D1::RectF(kPanelX + kPad + 14.f, lineY,
                                      kPanelX + kPanelW - kPad, lineY + kLineH);
-        m_brush->SetColor(D2D1::ColorF(0.9f, 0.75f, 0.2f, 1.f));   // amber
+        m_brush->SetColor(sel
+            ? D2D1::ColorF(0.9f, 0.75f, 0.2f, 1.f)
+            : D2D1::ColorF(0.6f, 0.5f,  0.15f, 1.f));
         m_renderTarget->DrawText(line, static_cast<UINT32>(wcslen(line)),
             m_menuTextFormat.Get(), r, m_brush.Get());
     }
@@ -536,7 +728,7 @@ void Renderer::DrawMenu(bool visible, const wchar_t* resLabel)
     // ── Credit ────────────────────────────────────────────────────────────────
     {
         const wchar_t* credit = L"Developed by JayLord";
-        float lineY = divY + 48.f;
+        float lineY = divY + 6.f + 4 * (kLineH + 2.f) + 4.f + kLineH + 6.f;
         D2D1_RECT_F r = D2D1::RectF(kPanelX + kPad, lineY,
                                      kPanelX + kPanelW - kPad, lineY + kLineH);
         m_shadowBrush->SetOpacity(0.8f);
@@ -551,7 +743,7 @@ void Renderer::DrawMenu(bool visible, const wchar_t* resLabel)
 
     // ── Hint ──────────────────────────────────────────────────────────────────
     {
-        const wchar_t* hint = L"[←→] Res  [INS] Toggle  [END] Exit";
+        const wchar_t* hint = L"[\u2191\u2193] select  [\u2190\u2192] toggle  [INS] hide";
         float lineY = kPanelY + kPanelH - kLineH - 6.f;
         D2D1_RECT_F r = D2D1::RectF(kPanelX + kPad, lineY,
                                      kPanelX + kPanelW - kPad, lineY + kLineH);

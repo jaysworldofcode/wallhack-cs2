@@ -110,8 +110,10 @@ namespace Pawn
     constexpr size_t    kOff_TeamNum      = m_iTeamNum       - kBatchBase; // 0x0BB
 }
 
-// ── CGameSceneNode ────────────────────────────────────────────────────────────
+// ── CGameSceneNode / CSkeletonInstance ───────────────────────────────────────
 // Reached by dereferencing pawn + Pawn::m_pGameSceneNode.
+// For player pawns the pointer actually points to a CSkeletonInstance, which
+// inherits from CGameSceneNode and carries the bone matrix array.
 namespace GameSceneNode
 {
     // Vector3 (3 × float) — absolute world-space position.
@@ -119,6 +121,69 @@ namespace GameSceneNode
 
     // bool — true when the entity is outside the local player's PVS.
     constexpr uintptr_t m_bDormant     = 0x103;
+
+    // CSkeletonInstance::m_modelState (embedded CModelState) starts here.
+    constexpr uintptr_t m_modelState   = 0x150;
+
+    // Offset of the bone world-transform pointer inside CModelState.
+    // Bone array pointer = sceneNode + m_modelState + m_boneArray
+    constexpr uintptr_t m_boneArray    = 0x80;
+}
+
+// ── Bone data ────────────────────────────────────────────────────────────────
+// Each entry in the bone array is 32 bytes (0x20):
+//   +0x00  quaternion  (float[4], 16 bytes)  — rotation
+//   +0x10  Vec3        (float[3], 12 bytes)  — world-space position  ← use this
+//   +0x1C  float                             — uniform scale
+namespace Bones
+{
+    constexpr uintptr_t kStride    = 0x20;  // bytes between consecutive bone entries
+    constexpr uintptr_t kPosOffset = 0x10;  // Vec3 world position starts after the quaternion
+
+    // Total bones to read (max used index + 1 for CS2 standard player model).
+    constexpr int kCount = 22;
+
+    // ── Bone indices — standard CS2 T/CT player model ────────────────────────
+    // Hierarchy: root(0) → pelvis(1) → spine chain(2-4) → neck(5) → head(6)
+    //            chest(4) → clavicles(7,11) → upper arms(8,12) → lower arms(9,13) → hands(10,14)
+    //            pelvis(1) → upper legs(15,19) → lower legs(16,20) → ankles(17,21)
+    constexpr int HEAD       = 6;
+    constexpr int NECK       = 5;
+    constexpr int CHEST      = 4;   // spine_2
+    constexpr int SPINE      = 2;   // spine_0
+    constexpr int PELVIS     = 1;   // pelvis (index 0 is root — skip it)
+    constexpr int LSHOULDER  = 7;   // clavicle_L
+    constexpr int LELBOW     = 8;   // arm_upper_L
+    constexpr int LWRIST     = 9;   // arm_lower_L
+    constexpr int RSHOULDER  = 11;  // clavicle_R
+    constexpr int RELBOW     = 12;  // arm_upper_R
+    constexpr int RWRIST     = 13;  // arm_lower_R
+    constexpr int LHIP       = 15;  // leg_upper_L
+    constexpr int LKNEE      = 16;  // leg_lower_L
+    constexpr int LANKLE     = 17;  // ankle_L
+    constexpr int RHIP       = 19;  // leg_upper_R
+    constexpr int RKNEE      = 20;  // leg_lower_R
+    constexpr int RANKLE     = 21;  // ankle_R
+}
+
+// ── Weapon reading ────────────────────────────────────────────────────────────
+// Chain: C_CSPlayerPawn → CPlayer_WeaponServices → active weapon handle →
+//        weapon entity (C_EconEntity) → C_AttributeContainer → C_EconItemView
+//        → m_iItemDefinitionIndex
+namespace Weapon
+{
+    // C_CSPlayerPawn::m_pWeaponServices — pointer to CPlayer_WeaponServices
+    constexpr uintptr_t m_pWeaponServices = 0x11E0;
+
+    // CPlayer_WeaponServices::m_hActiveWeapon — CHandle<C_CSWeaponBase>
+    constexpr uintptr_t m_hActiveWeapon   = 0x60;
+
+    // From the weapon entity base:
+    //   C_EconEntity::m_AttributeManager   at 0x1180  (embedded struct)
+    //   C_AttributeContainer::m_Item        at 0x50   (embedded struct)
+    //   C_EconItemView::m_iItemDefinitionIndex at 0x1BA  (uint16)
+    constexpr uintptr_t m_iItemDefinitionIndex =
+        0x1180 + 0x50 + 0x1BA;  // = 0x13EA from weapon entity base
 }
 
 // ── Handle encoding ───────────────────────────────────────────────────────────

@@ -243,11 +243,75 @@ bool EntityManager::ReadController(uintptr_t          controllerAddr,
     const uint8_t lifeState = buf[Offsets::Pawn::kOff_LifeState];
     const uint8_t teamNum   = buf[Offsets::Pawn::kOff_TeamNum];
 
-    // ── Scene node: origin only (1 RPM) ──────────────────────────────────────
+    // ── Scene node: origin (1 RPM) ───────────────────────────────────────────
     Vec3 origin = Memory::Read<Vec3>(
         m_hProcess,
         sceneNode + Offsets::GameSceneNode::m_vecAbsOrigin
     );
+
+    // ── Bones: read full world-transform array in one RPM call ────────────────
+    //
+    // CSkeletonInstance (which pGameSceneNode points to for player pawns)
+    // embeds CModelState at +0x150.  Inside CModelState the runtime bone
+    // array pointer lives at +0x80, giving sceneNode + 0x1D0.
+    // Each entry is kStride (0x20) bytes; Vec3 world pos sits at byte 0.
+    //
+    out.hasBones = false;
+    {
+        uintptr_t boneArrayPtr = Memory::Read<uintptr_t>(
+            m_hProcess,
+            sceneNode + Offsets::GameSceneNode::m_modelState
+                      + Offsets::GameSceneNode::m_boneArray
+        );
+
+        if (boneArrayPtr)
+        {
+            // Read all bone entries in a single RPM call.
+            constexpr size_t kTotalBytes =
+                Offsets::Bones::kCount * Offsets::Bones::kStride;
+            uint8_t boneBuf[kTotalBytes]{};
+            SIZE_T bytesRead = 0;
+
+            if (ReadProcessMemory(
+                    m_hProcess,
+                    reinterpret_cast<LPCVOID>(boneArrayPtr),
+                    boneBuf, kTotalBytes, &bytesRead)
+                && bytesRead == kTotalBytes)
+            {
+                for (int i = 0; i < Offsets::Bones::kCount; ++i)
+                {
+                    // Each entry: [quaternion 16 B][position Vec3 12 B][scale 4 B]
+                    // Position sits at kPosOffset (0x10) past the quaternion.
+                    std::memcpy(&out.bones[i],
+                                boneBuf + i * Offsets::Bones::kStride
+                                        + Offsets::Bones::kPosOffset,
+                                sizeof(Vec3));
+                }
+                out.hasBones = true;
+            }
+        }
+    }
+
+    // ── Active weapon (2 RPM) ─────────────────────────────────────────────────
+    out.weaponId = 0;
+    {
+        uintptr_t weaponSvc = Memory::Read<uintptr_t>(
+            m_hProcess, pawnAddr + Offsets::Weapon::m_pWeaponServices);
+        if (weaponSvc)
+        {
+            uint32_t weaponHandle = Memory::Read<uint32_t>(
+                m_hProcess, weaponSvc + Offsets::Weapon::m_hActiveWeapon);
+            int weaponIdx = Offsets::HandleToIndex(weaponHandle);
+            uintptr_t weaponEntity = GetEntityByIndex(
+                chunkArrayAddr, weaponIdx, m_chunk0Ptr);
+            if (weaponEntity)
+            {
+                out.weaponId = Memory::Read<uint16_t>(
+                    m_hProcess,
+                    weaponEntity + Offsets::Weapon::m_iItemDefinitionIndex);
+            }
+        }
+    }
 
     out.pawnAddress = pawnAddr;
     out.alive       = (lifeState == 0);

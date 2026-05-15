@@ -25,8 +25,19 @@
 
 #include "../game/entity.hpp"
 #include "../math/math_utils.hpp"
+#include "../game/offsets.hpp"
 
 using Microsoft::WRL::ComPtr;
+
+// ── Feature toggles ──────────────────────────────────────────────────────────
+// Controlled by the in-game menu (keys 1-4). All default to on.
+struct Features
+{
+    bool showBox    = true;
+    bool showName   = true;
+    bool showHealth = true;
+    bool showWeapon = true;
+};
 
 class Renderer
 {
@@ -44,14 +55,17 @@ public:
     /// Returns false if the device is lost and recreation failed.
     bool BeginFrame();
 
-    /// Draw one entity's bounding box and HP bar.
+    /// Draw one entity: skeleton lines, name tag, and health number.
     ///
     /// @param entity    Snapshot from EntityManager.
-    /// @param box       Pre-computed screen AABB from GetScreenBox().
+    /// @param box       Screen AABB used for name/health label placement.
     /// @param isEnemy   Selects colour scheme (red vs. green).
+    /// @param vm        Current frame's view-projection matrix for bone projection.
     void DrawEntity(const EntityData& entity,
                     const ScreenBox&  box,
-                    bool              isEnemy);
+                    bool              isEnemy,
+                    const ViewMatrix& vm,
+                    const Features&   feat);
 
     /// Submit all draw calls to the GPU.
     void EndFrame();
@@ -66,9 +80,8 @@ public:
     void DrawDebugHUD(bool attached, int entityCount, const std::wstring& diagLine = {});
 
     /// Draw the toggleable overlay menu panel (INSERT key).
-    /// @param resLabel  Current resolution string shown in the panel (e.g. "1920x1080").
     /// When visible = false the function is a no-op.
-    void DrawMenu(bool visible, const wchar_t* resLabel);
+    void DrawMenu(bool visible, const wchar_t* resLabel, const Features& feat, int cursor);
 
     /// Draw a persistent "Developed by JayLord" watermark in the bottom-right.
     void DrawWatermark();
@@ -113,15 +126,20 @@ private:
     /// Release resources that must be recreated with the render target.
     void ReleaseDeviceResources();
 
-    /// Draw a 1-pixel corner-bracket outline (less visually noisy than a full
-    /// rectangle at large distances).
+    /// Draw a corner-bracket outline around the entity AABB.
     void DrawCornerBox(const D2D1_RECT_F& rect, ID2D1Brush* brush);
+
+    /// Project all bones and draw skeleton lines between them.
+    void DrawSkeleton(const EntityData& entity, const ViewMatrix& vm);
 
     /// Draw the HP bar to the left of the AABB.
     void DrawHpBar(const ScreenBox& box, int health);
 
     /// Draw the player's name above the box.
     void DrawName(const EntityData& entity, const ScreenBox& box);
+
+    /// Draw the active weapon name above the player name.
+    void DrawWeaponName(const EntityData& entity, const ScreenBox& box);
 
     /// Draw the player's HP as a number centred below the box.
     void DrawHealthNumber(int health, const ScreenBox& box);

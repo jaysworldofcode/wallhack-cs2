@@ -149,10 +149,12 @@ int WINAPI WinMain(
 
     // ── 5. Main loop ──────────────────────────────────────────────────────────
 
-    bool menuVisible  = false;  // toggled by INSERT key
-    bool prevInsert   = false;  // edge-detection for INSERT
-    bool prevLeft     = false;  // edge-detection for LEFT arrow
-    bool prevRight    = false;  // edge-detection for RIGHT arrow
+    bool menuVisible = true;    // open on launch so the user sees the controls immediately
+    bool prevInsert  = false;  // edge-detection for INSERT
+
+    Features feat;              // all features on by default
+    int  menuCursor = 0;        // 0-3 = features, 4 = resolution
+    bool prevUp = false, prevDown = false, prevLeft = false, prevRight = false;
 
     while (true)
     {
@@ -164,32 +166,46 @@ int WINAPI WinMain(
             menuVisible = !menuVisible;
         prevInsert = curInsert;
 
-        // ── Arrow keys: cycle resolution (only while menu is open) ───────────
+        // ── Arrow-key menu navigation (only while menu is open) ──────────────
         if (menuVisible)
         {
+            const bool curUp    = (GetAsyncKeyState(VK_UP)    & 0x8000) != 0;
+            const bool curDown  = (GetAsyncKeyState(VK_DOWN)  & 0x8000) != 0;
             const bool curLeft  = (GetAsyncKeyState(VK_LEFT)  & 0x8000) != 0;
             const bool curRight = (GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
 
+            // UP / DOWN — move cursor through 5 rows (0-3 features, 4 resolution)
+            if (curUp   && !prevUp)   menuCursor = (menuCursor + 4) % 5;
+            if (curDown && !prevDown) menuCursor = (menuCursor + 1) % 5;
+
+            // LEFT / RIGHT — toggle feature or cycle resolution
             if (curLeft && !prevLeft)
             {
-                gResIdx = (gResIdx - 1 + kResCount) % kResCount;
-                overlay.Resize(kResolutions[gResIdx].w, kResolutions[gResIdx].h);
-                renderer.Resize(kResolutions[gResIdx].w, kResolutions[gResIdx].h);
+                if      (menuCursor == 0) feat.showBox    = !feat.showBox;
+                else if (menuCursor == 1) feat.showName   = !feat.showName;
+                else if (menuCursor == 2) feat.showHealth = !feat.showHealth;
+                else if (menuCursor == 3) feat.showWeapon = !feat.showWeapon;
+                else { gResIdx = (gResIdx - 1 + kResCount) % kResCount;
+                       overlay.Resize(kResolutions[gResIdx].w, kResolutions[gResIdx].h);
+                       renderer.Resize(kResolutions[gResIdx].w, kResolutions[gResIdx].h); }
             }
             if (curRight && !prevRight)
             {
-                gResIdx = (gResIdx + 1) % kResCount;
-                overlay.Resize(kResolutions[gResIdx].w, kResolutions[gResIdx].h);
-                renderer.Resize(kResolutions[gResIdx].w, kResolutions[gResIdx].h);
+                if      (menuCursor == 0) feat.showBox    = !feat.showBox;
+                else if (menuCursor == 1) feat.showName   = !feat.showName;
+                else if (menuCursor == 2) feat.showHealth = !feat.showHealth;
+                else if (menuCursor == 3) feat.showWeapon = !feat.showWeapon;
+                else { gResIdx = (gResIdx + 1) % kResCount;
+                       overlay.Resize(kResolutions[gResIdx].w, kResolutions[gResIdx].h);
+                       renderer.Resize(kResolutions[gResIdx].w, kResolutions[gResIdx].h); }
             }
 
-            prevLeft  = curLeft;
-            prevRight = curRight;
+            prevUp    = curUp;   prevDown  = curDown;
+            prevLeft  = curLeft; prevRight = curRight;
         }
         else
         {
-            prevLeft  = false;
-            prevRight = false;
+            prevUp = prevDown = prevLeft = prevRight = false;
         }
 
         // Process Windows messages; exit loop on WM_QUIT.
@@ -233,7 +249,7 @@ int WINAPI WinMain(
         renderer.DrawWatermark();
 
         // Toggleable menu panel (INSERT key).
-        renderer.DrawMenu(menuVisible, kResolutions[gResIdx].label);
+        renderer.DrawMenu(menuVisible, kResolutions[gResIdx].label, feat, menuCursor);
 
         for (const EntityData& entity : entities)
         {
@@ -251,7 +267,7 @@ int WINAPI WinMain(
             const bool isEnemy = entity.IsEnemy(entityMgr.LocalTeam());
             if (!isEnemy) continue;        // don't draw teammates
             if (!entity.alive) continue;   // hide box while dead
-            renderer.DrawEntity(entity, *screenBox, isEnemy);
+            renderer.DrawEntity(entity, *screenBox, isEnemy, viewMatrix, feat);
         }
 
         renderer.EndFrame();
