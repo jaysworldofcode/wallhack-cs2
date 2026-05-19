@@ -19,6 +19,7 @@
 
 #include "offsets.hpp"
 #include "../math/vec3.hpp"
+#include "../config/remote_offsets.hpp"
 
 // ── EntityData ───────────────────────────────────────────────────────────────
 
@@ -128,7 +129,8 @@ class EntityManager
 {
 public:
     /// Call once to bind the manager to the target process and module bases.
-    void Init(HANDLE hProcess, uintptr_t clientBase);
+    /// `offsets` provides the 3 runtime-fetched Client offsets.
+    void Init(HANDLE hProcess, uintptr_t clientBase, const RemoteOffsets& offsets);
 
     /// Read all player entities for the current frame.
     /// Call this once per tick before passing the results to the renderer.
@@ -147,6 +149,10 @@ public:
 private:
     HANDLE    m_hProcess   = NULL;
     uintptr_t m_clientBase = 0;
+
+    // Runtime-fetched offsets (overrides compile-time defaults).
+    uintptr_t m_offEntityList  = Offsets::Client::dwEntityList;
+    uintptr_t m_offLocalPlayer = Offsets::Client::dwLocalPlayer;
 
     int m_localTeam = 0;
     std::vector<EntityData> m_entities;

@@ -19,6 +19,9 @@
     <ClCompile Include="E:\Projects\cs2c\src\renderer\renderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="E:\Projects\cs2c\src\config\remote_offsets.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="E:\Projects\cs2c\CMakeLists.txt" />

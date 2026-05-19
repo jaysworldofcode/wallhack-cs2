@@ -6,10 +6,13 @@
 
 // ── EntityManager::Init ───────────────────────────────────────────────────────
 
-void EntityManager::Init(HANDLE hProcess, uintptr_t clientBase)
+void EntityManager::Init(HANDLE hProcess, uintptr_t clientBase,
+                         const RemoteOffsets& offsets)
 {
-    m_hProcess   = hProcess;
-    m_clientBase = clientBase;
+    m_hProcess        = hProcess;
+    m_clientBase      = clientBase;
+    m_offEntityList   = offsets.dwEntityList;
+    m_offLocalPlayer  = offsets.dwLocalPlayer;
     m_entities.reserve(64);
     m_controllerCache.reserve(64);
     // Force a full cache refresh on the very first Update().
@@ -76,14 +79,14 @@ bool EntityManager::Update()
 
     uintptr_t entitySystemAddr = Memory::Read<uintptr_t>(
         m_hProcess,
-        m_clientBase + Offsets::Client::dwEntityList
+        m_clientBase + m_offEntityList
     );
     if (!entitySystemAddr)
     {
         wchar_t buf[128];
         swprintf_s(buf, L"entitySys=0 | base=%llX off=%llX",
             (unsigned long long)m_clientBase,
-            (unsigned long long)Offsets::Client::dwEntityList);
+            (unsigned long long)m_offEntityList);
         m_debugLine = buf;
         return false;
     }
@@ -104,7 +107,7 @@ bool EntityManager::Update()
 
     uintptr_t localControllerAddr = Memory::Read<uintptr_t>(
         m_hProcess,
-        m_clientBase + Offsets::Client::dwLocalPlayer
+        m_clientBase + m_offLocalPlayer
     );
 
     uintptr_t localPawnAddr = 0;

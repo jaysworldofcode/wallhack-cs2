@@ -14,6 +14,7 @@ set(SOURCES
     src/game/entity.cpp
     src/overlay/overlay.cpp
     src/renderer/renderer.cpp
+    src/config/remote_offsets.cpp
 )
 
 add_executable(cs2_overlay WIN32 ${SOURCES})
@@ -30,6 +31,7 @@ target_link_libraries(cs2_overlay PRIVATE
     d3d11         # Direct3D 11 (backing D2D device)
     dxgi          # DXGI swap chain
     psapi         # Process Status API (EnumProcessModules)
+    winhttp       # WinHTTP (remote offset fetch)
 )
 
 # Treat warnings as errors in Debug for clean code

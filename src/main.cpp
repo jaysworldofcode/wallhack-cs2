@@ -58,6 +58,7 @@
 #include "renderer/renderer.hpp"
 #include "math/math_utils.hpp"
 #include "game/offsets.hpp"
+#include "config/remote_offsets.hpp"
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 
@@ -94,7 +95,13 @@ int WINAPI WinMain(
     _In_     LPSTR     /*lpCmdLine*/,
     _In_     int       /*nCmdShow*/)
 {
-    // ── 1. Attach to CS2 ──────────────────────────────────────────────────────
+    // ── 1. Fetch offsets from GitHub ──────────────────────────────────────────
+    //
+    // Blocking call (≤ 3 s timeout). Falls back to compiled defaults silently.
+
+    const RemoteOffsets remoteOffsets = FetchRemoteOffsets();
+
+    // ── 2. Attach to CS2 ──────────────────────────────────────────────────────
 
     HANDLE hProcess = Memory::OpenProcessByName(L"cs2.exe");
     if (!hProcess)
@@ -145,7 +152,7 @@ int WINAPI WinMain(
     // ── 4. Initialise entity manager ──────────────────────────────────────────
 
     EntityManager entityMgr;
-    entityMgr.Init(hProcess, clientBase);
+    entityMgr.Init(hProcess, clientBase, remoteOffsets);
 
     // ── 5. Main loop ──────────────────────────────────────────────────────────
 
@@ -219,7 +226,7 @@ int WINAPI WinMain(
         //
         ViewMatrix viewMatrix = Memory::Read<ViewMatrix>(
             hProcess,
-            clientBase + Offsets::Client::dwViewMatrix
+            clientBase + remoteOffsets.dwViewMatrix
         );
 
         // ── 5b. Snapshot all entities ─────────────────────────────────────────
