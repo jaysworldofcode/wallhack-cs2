@@ -9,10 +9,11 @@
 void EntityManager::Init(HANDLE hProcess, uintptr_t clientBase,
                          const RemoteOffsets& offsets)
 {
-    m_hProcess        = hProcess;
-    m_clientBase      = clientBase;
-    m_offEntityList   = offsets.dwEntityList;
-    m_offLocalPlayer  = offsets.dwLocalPlayer;
+    m_hProcess           = hProcess;
+    m_clientBase         = clientBase;
+    m_offEntityList      = offsets.dwEntityList;
+    m_offLocalPlayer     = offsets.dwLocalPlayer;
+    m_offLocalPlayerPawn = offsets.dwLocalPlayerPawn;
     m_entities.reserve(64);
     m_controllerCache.reserve(64);
     // Force a full cache refresh on the very first Update().
@@ -103,30 +104,22 @@ bool EntityManager::Update()
         );
     }
 
-    // ── 2. Local player team (3 RPM → 2 RPM via chunk cache) ─────────────────
+    // ── 2. Local player pawn + team ───────────────────────────────────────────
+    //
+    // dwLocalPlayerPawn is a direct pointer to C_CSPlayerPawn — one RPM,
+    // no handle decoding or entity-list lookup required.
 
-    uintptr_t localControllerAddr = Memory::Read<uintptr_t>(
+    uintptr_t localPawnAddr = Memory::Read<uintptr_t>(
         m_hProcess,
-        m_clientBase + m_offLocalPlayer
+        m_clientBase + m_offLocalPlayerPawn
     );
 
-    uintptr_t localPawnAddr = 0;
-    if (localControllerAddr)
+    if (localPawnAddr)
     {
-        uint32_t localPawnHandle = Memory::Read<uint32_t>(
+        m_localTeam = static_cast<int>(Memory::Read<uint8_t>(
             m_hProcess,
-            localControllerAddr + Offsets::Controller::m_hPlayerPawn
-        );
-        int localPawnIdx = Offsets::HandleToIndex(localPawnHandle);
-        localPawnAddr = GetEntityByIndex(chunkArrayAddr, localPawnIdx, m_chunk0Ptr);
-
-        if (localPawnAddr)
-        {
-            m_localTeam = static_cast<int>(Memory::Read<uint8_t>(
-                m_hProcess,
-                localPawnAddr + Offsets::Pawn::m_iTeamNum
-            ));
-        }
+            localPawnAddr + Offsets::Pawn::m_iTeamNum
+        ));
     }
 
     // ── 3. Controller cache refresh (only every kCacheFrames) ─────────────────

@@ -32,6 +32,9 @@ namespace Client
     // Pointer to the local CCSPlayerController.
     constexpr uintptr_t dwLocalPlayer = 0x2345D50;
 
+    // Direct pointer to the local C_CSPlayerPawn (bypasses handle chain).
+    constexpr uintptr_t dwLocalPlayerPawn = 0x2090880;
+
     // Flat 4×4 float view-projection matrix (64 bytes, 16 floats).
     // Updated every frame by the renderer — safe to read each tick.
     constexpr uintptr_t dwViewMatrix  = 0x236C2F0;

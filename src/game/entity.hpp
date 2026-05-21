@@ -48,7 +48,7 @@ struct EntityData
     uint16_t weaponId = 0;     // m_iItemDefinitionIndex; 0 = unknown
 
     // ── Convenience ──────────────────────────────────────────────────────────
-    bool IsEnemy(int localTeam) const { return team != localTeam && team != 0; }
+    bool IsEnemy(int localTeam) const { return localTeam != 0 && team != 0 && team != localTeam; }
 
     // Returns the display name for the active weapon, e.g. "AK-47" or "AWP".
     // Returns an empty string if the weapon ID is unknown or not yet read.
@@ -151,8 +151,9 @@ private:
     uintptr_t m_clientBase = 0;
 
     // Runtime-fetched offsets (overrides compile-time defaults).
-    uintptr_t m_offEntityList  = Offsets::Client::dwEntityList;
-    uintptr_t m_offLocalPlayer = Offsets::Client::dwLocalPlayer;
+    uintptr_t m_offEntityList      = Offsets::Client::dwEntityList;
+    uintptr_t m_offLocalPlayer     = Offsets::Client::dwLocalPlayer;
+    uintptr_t m_offLocalPlayerPawn = Offsets::Client::dwLocalPlayerPawn;
 
     int m_localTeam = 0;
     std::vector<EntityData> m_entities;

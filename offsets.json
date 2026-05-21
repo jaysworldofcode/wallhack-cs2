@@ -1,5 +1,6 @@
 {
-  "dwEntityList":  "0x250C5B0",
-  "dwLocalPlayer": "0x2345D50",
-  "dwViewMatrix":  "0x236C2F0"
+  "dwEntityList":      "0x250C5B0",
+  "dwLocalPlayer":     "0x2345D50",
+  "dwLocalPlayerPawn": "0x2090880",
+  "dwViewMatrix":      "0x236C2F0"
 }

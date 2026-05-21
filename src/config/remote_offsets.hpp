@@ -14,9 +14,10 @@
 
 struct RemoteOffsets
 {
-    uintptr_t dwEntityList  = 0;
-    uintptr_t dwLocalPlayer = 0;
-    uintptr_t dwViewMatrix  = 0;
+    uintptr_t dwEntityList     = 0;
+    uintptr_t dwLocalPlayer    = 0;
+    uintptr_t dwLocalPlayerPawn = 0;
+    uintptr_t dwViewMatrix     = 0;
 
     // true  → values came from GitHub
     // false → values are the compiled-in defaults from offsets.hpp

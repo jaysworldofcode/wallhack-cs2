@@ -43,10 +43,11 @@ RemoteOffsets FetchRemoteOffsets()
 {
     // Start with the compiled-in defaults so we always return valid values.
     RemoteOffsets result;
-    result.dwEntityList  = Offsets::Client::dwEntityList;
-    result.dwLocalPlayer = Offsets::Client::dwLocalPlayer;
-    result.dwViewMatrix  = Offsets::Client::dwViewMatrix;
-    result.fromRemote    = false;
+    result.dwEntityList      = Offsets::Client::dwEntityList;
+    result.dwLocalPlayer     = Offsets::Client::dwLocalPlayer;
+    result.dwLocalPlayerPawn = Offsets::Client::dwLocalPlayerPawn;
+    result.dwViewMatrix      = Offsets::Client::dwViewMatrix;
+    result.fromRemote        = false;
 
     // ── Open WinHTTP session ──────────────────────────────────────────────────
 
@@ -150,22 +151,25 @@ RemoteOffsets FetchRemoteOffsets()
     //
     // Expected format (order doesn't matter):
     //   {
-    //     "dwEntityList":  "0x250C5B0",
-    //     "dwLocalPlayer": "0x2345D50",
-    //     "dwViewMatrix":  "0x236C2F0"
+    //     "dwEntityList":      "0x250C5B0",
+    //     "dwLocalPlayer":     "0x2345D50",
+    //     "dwLocalPlayerPawn": "0x2090880",
+    //     "dwViewMatrix":      "0x236C2F0"
     //   }
 
-    const uintptr_t el  = ParseHexValue(body, "dwEntityList",  result.dwEntityList);
-    const uintptr_t lp  = ParseHexValue(body, "dwLocalPlayer", result.dwLocalPlayer);
-    const uintptr_t vm  = ParseHexValue(body, "dwViewMatrix",  result.dwViewMatrix);
+    const uintptr_t el  = ParseHexValue(body, "dwEntityList",      result.dwEntityList);
+    const uintptr_t lp  = ParseHexValue(body, "dwLocalPlayer",     result.dwLocalPlayer);
+    const uintptr_t lpp = ParseHexValue(body, "dwLocalPlayerPawn", result.dwLocalPlayerPawn);
+    const uintptr_t vm  = ParseHexValue(body, "dwViewMatrix",      result.dwViewMatrix);
 
-    // Only accept the remote values if all three parsed successfully.
-    if (el && lp && vm)
+    // Only accept the remote values if all four parsed successfully.
+    if (el && lp && lpp && vm)
     {
-        result.dwEntityList  = el;
-        result.dwLocalPlayer = lp;
-        result.dwViewMatrix  = vm;
-        result.fromRemote    = true;
+        result.dwEntityList      = el;
+        result.dwLocalPlayer     = lp;
+        result.dwLocalPlayerPawn = lpp;
+        result.dwViewMatrix      = vm;
+        result.fromRemote        = true;
     }
 
     return result;
