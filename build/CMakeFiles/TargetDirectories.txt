@@ -1,3 +1,3 @@
-E:/Projects/cs2c/build/CMakeFiles/cs2_overlay.dir
-E:/Projects/cs2c/build/CMakeFiles/ALL_BUILD.dir
-E:/Projects/cs2c/build/CMakeFiles/ZERO_CHECK.dir
+C:/Projects/wallhack-cs2/build/CMakeFiles/cs2_overlay.dir
+C:/Projects/wallhack-cs2/build/CMakeFiles/edit_cache.dir
+C:/Projects/wallhack-cs2/build/CMakeFiles/rebuild_cache.dir

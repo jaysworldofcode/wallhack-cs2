@@ -1,7 +1,7 @@
 {
 	"InstallScripts" : 
 	[
-		"E:/Projects/cs2c/build/cmake_install.cmake"
+		"C:/Projects/wallhack-cs2/build/cmake_install.cmake"
 	],
 	"Parallel" : false
 }
