@@ -1,22 +1,4 @@
 # ninja log v7
-32	809	8018811737605428	CMakeFiles/cs2_overlay.dir/src/math/math_utils.cpp.obj	cd397d9d3be4b68f
-39	1022	8018811737675439	CMakeFiles/cs2_overlay.dir/src/overlay/overlay.cpp.obj	8b5ee61a108fa116
-28	1235	8018811737575418	CMakeFiles/cs2_overlay.dir/src/memory/memory.cpp.obj	350ed398990556ea
-46	1257	8018811737745459	CMakeFiles/cs2_overlay.dir/src/config/remote_offsets.cpp.obj	83aeb1ea99fe2041
-35	1874	8018811737645436	CMakeFiles/cs2_overlay.dir/src/game/entity.cpp.obj	76a6c251b0b6b108
-42	2010	8018811737715448	CMakeFiles/cs2_overlay.dir/src/renderer/renderer.cpp.obj	b00e62469b00b782
-24	2586	8018811737535409	CMakeFiles/cs2_overlay.dir/src/main.cpp.obj	27de4aafe419ff30
-2586	2678	8018811763156179	cs2_overlay.exe	c9f9700792c12d57
-7	19	8018812239349263	clean	d6bb36ef89707376
-18	765	8018812397335153	CMakeFiles/cs2_overlay.dir/src/math/math_utils.cpp.obj	cd397d9d3be4b68f
-25	1048	8018812397405165	CMakeFiles/cs2_overlay.dir/src/overlay/overlay.cpp.obj	8b5ee61a108fa116
-15	1199	8018812397295145	CMakeFiles/cs2_overlay.dir/src/memory/memory.cpp.obj	350ed398990556ea
-33	1283	8018812397485186	CMakeFiles/cs2_overlay.dir/src/config/remote_offsets.cpp.obj	83aeb1ea99fe2041
-22	1893	8018812397365157	CMakeFiles/cs2_overlay.dir/src/game/entity.cpp.obj	76a6c251b0b6b108
-29	2051	8018812397445179	CMakeFiles/cs2_overlay.dir/src/renderer/renderer.cpp.obj	b00e62469b00b782
-10	2569	8018812397255142	CMakeFiles/cs2_overlay.dir/src/main.cpp.obj	27de4aafe419ff30
-2569	2660	8018812422840933	cs2_overlay.exe	c9f9700792c12d57
-21	33	8018812618885109	clean	d6bb36ef89707376
 22	621	8018812619305203	CMakeFiles/cs2_overlay.dir/src/math/math_utils.cpp.obj	cd397d9d3be4b68f
 28	821	8018812619365220	CMakeFiles/cs2_overlay.dir/src/overlay/overlay.cpp.obj	8b5ee61a108fa116
 19	1038	8018812619275198	CMakeFiles/cs2_overlay.dir/src/memory/memory.cpp.obj	350ed398990556ea
@@ -25,3 +7,9 @@
 32	1740	8018812619405230	CMakeFiles/cs2_overlay.dir/src/renderer/renderer.cpp.obj	b00e62469b00b782
 15	2270	8018812619235186	CMakeFiles/cs2_overlay.dir/src/main.cpp.obj	27de4aafe419ff30
 2270	2361	8018812641780233	cs2_overlay.exe	c9f9700792c12d57
+21	33	8018812618885109	clean	d6bb36ef89707376
+30	1663	8021250572614217	CMakeFiles/cs2_overlay.dir/src/config/remote_offsets.cpp.obj	83aeb1ea99fe2041
+18	2115	8021250572494190	CMakeFiles/cs2_overlay.dir/src/game/entity.cpp.obj	76a6c251b0b6b108
+23	2447	8021250572554201	CMakeFiles/cs2_overlay.dir/src/renderer/renderer.cpp.obj	b00e62469b00b782
+6	3029	8021250572386649	CMakeFiles/cs2_overlay.dir/src/main.cpp.obj	27de4aafe419ff30
+3030	3597	8021250602610953	cs2_overlay.exe	c9f9700792c12d57
