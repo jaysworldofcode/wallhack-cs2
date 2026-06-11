@@ -13,28 +13,30 @@ if not exist "%VCVARS%" (
 call "%VCVARS%" >nul
 cd /d "%~dp0"
 
-where cmake >nul 2>&1
-if errorlevel 1 (
-    if exist "C:\Program Files\CMake\bin\cmake.exe" (
-        set "PATH=C:\Program Files\CMake\bin;%PATH%"
-    ) else (
-        echo ERROR: cmake not found on PATH.
-        exit /b 1
-    )
+set "CMAKE="
+if exist "C:\Program Files\CMake\bin\cmake.exe" set "CMAKE=C:\Program Files\CMake\bin\cmake.exe"
+if not defined CMAKE if exist "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" set "CMAKE=C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
+if not defined CMAKE (
+    where cmake >nul 2>&1
+    if not errorlevel 1 set "CMAKE=cmake"
+)
+if not defined CMAKE (
+    echo ERROR: cmake not found.
+    exit /b 1
 )
 
 if not exist "build\build.ninja" (
     echo Configuring...
-    cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release ^
+    "%CMAKE%" -B build -G Ninja -DCMAKE_BUILD_TYPE=Release ^
         -DCMAKE_MAKE_PROGRAM="%NINJA%"
     if errorlevel 1 exit /b 1
 )
 
 echo Building...
 if /i "%~1"=="clean" (
-    cmake --build build --clean-first
+    "%CMAKE%" --build build --clean-first
 ) else (
-    cmake --build build %*
+    "%CMAKE%" --build build %*
 )
 if errorlevel 1 exit /b 1
 
