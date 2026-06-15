@@ -1,6 +1,6 @@
 #pragma once
 //
-// offsets.hpp — CS2 (Source 2) memory offsets — dump 2026-06-11
+// offsets.hpp — CS2 (Source 2) memory offsets — dump 2026-06-15
 //
 // ┌──────────────────────────────────────────────────────────────────────────┐
 // │  EDUCATIONAL NOTE                                                        │
