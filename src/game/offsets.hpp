@@ -1,6 +1,6 @@
 #pragma once
 //
-// offsets.hpp — CS2 (Source 2) memory offsets — dump 2026-06-15
+// offsets.hpp — CS2 (Source 2) memory offsets — dump 2026-07-01
 //
 // ┌──────────────────────────────────────────────────────────────────────────┐
 // │  EDUCATIONAL NOTE                                                        │
@@ -27,17 +27,17 @@ namespace Offsets {
 namespace Client
 {
     // Pointer to CGameEntitySystem (the entity list root).
-    constexpr uintptr_t dwEntityList  = 0x24E76A0;
+    constexpr uintptr_t dwEntityList  = 0x24E7680;
 
     // Pointer to the local CCSPlayerController (cs2-dumper: dwLocalPlayerController).
-    constexpr uintptr_t dwLocalPlayer = 0x2320720;
+    constexpr uintptr_t dwLocalPlayer = 0x2320570;
 
     // Direct pointer to the local C_CSPlayerPawn (bypasses handle chain).
-    constexpr uintptr_t dwLocalPlayerPawn = 0x2341698;
+    constexpr uintptr_t dwLocalPlayerPawn = 0x2341528;
 
     // Flat 4×4 float view-projection matrix (64 bytes, 16 floats).
     // Updated every frame by the renderer — safe to read each tick.
-    constexpr uintptr_t dwViewMatrix  = 0x2346B30;
+    constexpr uintptr_t dwViewMatrix  = 0x23469C0;
 }
 
 // ── CEntityIdentity (entity list entry) ──────────────────────────────────────

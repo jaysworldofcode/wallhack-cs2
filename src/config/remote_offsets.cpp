@@ -151,10 +151,10 @@ RemoteOffsets FetchRemoteOffsets()
     //
     // Expected format (order doesn't matter):
     //   {
-    //     "dwEntityList":      "0x24E76A0",
-    //     "dwLocalPlayer":     "0x2320720",
-    //     "dwLocalPlayerPawn": "0x2341698",
-    //     "dwViewMatrix":      "0x2346B30"
+    //     "dwEntityList":      "0x24E7680",
+    //     "dwLocalPlayer":     "0x2320570",
+    //     "dwLocalPlayerPawn": "0x2341528",
+    //     "dwViewMatrix":      "0x23469C0"
     //   }
 
     const uintptr_t el  = ParseHexValue(body, "dwEntityList",      result.dwEntityList);
